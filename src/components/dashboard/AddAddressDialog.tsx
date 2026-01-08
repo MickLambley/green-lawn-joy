@@ -18,9 +18,16 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 import { MapPin, Loader2 } from "lucide-react";
 
 const addressSchema = z.object({
@@ -49,11 +56,8 @@ const addressSchema = z.object({
     .trim()
     .min(2, "Country is required")
     .max(100, "Country must be less than 100 characters"),
-  notes: z
-    .string()
-    .trim()
-    .max(500, "Notes must be less than 500 characters")
-    .optional(),
+  slope: z.enum(["flat", "mild", "steep"]),
+  tier_count: z.number().min(1).max(10),
 });
 
 type AddressFormData = z.infer<typeof addressSchema>;
@@ -74,16 +78,39 @@ const AddAddressDialog = ({ open, onOpenChange, onSuccess }: AddAddressDialogPro
       city: "",
       state: "",
       postal_code: "",
-      country: "",
-      notes: "",
+      country: "Australia",
+      slope: "flat",
+      tier_count: 1,
     },
   });
 
   const onSubmit = async (data: AddressFormData) => {
     setIsSubmitting(true);
     try {
-      // For now, just show success since database tables aren't set up yet
-      console.log("Address submitted:", data);
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        toast.error("You must be logged in to add an address.");
+        return;
+      }
+
+      const { error } = await supabase.from("addresses").insert({
+        user_id: user.id,
+        street_address: data.street_address,
+        city: data.city,
+        state: data.state,
+        postal_code: data.postal_code,
+        country: data.country,
+        slope: data.slope,
+        tier_count: data.tier_count,
+      });
+
+      if (error) {
+        console.error("Error adding address:", error);
+        toast.error("Failed to submit address. Please try again.");
+        return;
+      }
+
       toast.success("Address submitted for verification!", {
         description: "We'll verify your property and notify you once it's approved.",
       });
@@ -180,7 +207,7 @@ const AddAddressDialog = ({ open, onOpenChange, onSuccess }: AddAddressDialogPro
                   <FormItem>
                     <FormLabel>Country</FormLabel>
                     <FormControl>
-                      <Input placeholder="Australia" {...field} />
+                      <Input {...field} disabled />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -188,24 +215,63 @@ const AddAddressDialog = ({ open, onOpenChange, onSuccess }: AddAddressDialogPro
               />
             </div>
 
-            <FormField
-              control={form.control}
-              name="notes"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Additional Notes (Optional)</FormLabel>
-                  <FormControl>
-                    <Textarea
-                      placeholder="Gate code, access instructions, etc."
-                      className="resize-none"
-                      rows={3}
-                      {...field}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            <div className="border-t pt-4 mt-4">
+              <h4 className="text-sm font-medium mb-3">Property Details</h4>
+              <p className="text-xs text-muted-foreground mb-4">
+                This helps us calculate accurate pricing for your property.
+              </p>
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="slope"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Land Slope</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select slope" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="flat">Flat</SelectItem>
+                          <SelectItem value="mild">Mild slope</SelectItem>
+                          <SelectItem value="steep">Steep slope</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="tier_count"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Number of Tiers</FormLabel>
+                      <Select 
+                        onValueChange={(val) => field.onChange(parseInt(val))} 
+                        defaultValue={field.value.toString()}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select tiers" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((num) => (
+                            <SelectItem key={num} value={num.toString()}>
+                              {num} {num === 1 ? "tier" : "tiers"}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+            </div>
 
             <div className="flex gap-3 pt-4">
               <Button

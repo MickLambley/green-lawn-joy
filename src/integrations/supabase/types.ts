@@ -14,16 +14,185 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      addresses: {
+        Row: {
+          admin_notes: string | null
+          city: string
+          country: string
+          created_at: string
+          fixed_price: number | null
+          id: string
+          postal_code: string
+          price_per_sqm: number | null
+          slope: Database["public"]["Enums"]["slope_type"]
+          square_meters: number | null
+          state: string
+          status: Database["public"]["Enums"]["address_status"]
+          street_address: string
+          tier_count: number
+          updated_at: string
+          user_id: string
+          verified_at: string | null
+          verified_by: string | null
+        }
+        Insert: {
+          admin_notes?: string | null
+          city: string
+          country?: string
+          created_at?: string
+          fixed_price?: number | null
+          id?: string
+          postal_code: string
+          price_per_sqm?: number | null
+          slope?: Database["public"]["Enums"]["slope_type"]
+          square_meters?: number | null
+          state: string
+          status?: Database["public"]["Enums"]["address_status"]
+          street_address: string
+          tier_count?: number
+          updated_at?: string
+          user_id: string
+          verified_at?: string | null
+          verified_by?: string | null
+        }
+        Update: {
+          admin_notes?: string | null
+          city?: string
+          country?: string
+          created_at?: string
+          fixed_price?: number | null
+          id?: string
+          postal_code?: string
+          price_per_sqm?: number | null
+          slope?: Database["public"]["Enums"]["slope_type"]
+          square_meters?: number | null
+          state?: string
+          status?: Database["public"]["Enums"]["address_status"]
+          street_address?: string
+          tier_count?: number
+          updated_at?: string
+          user_id?: string
+          verified_at?: string | null
+          verified_by?: string | null
+        }
+        Relationships: []
+      }
+      bookings: {
+        Row: {
+          address_id: string
+          admin_notes: string | null
+          created_at: string
+          id: string
+          notes: string | null
+          scheduled_date: string
+          scheduled_time: string | null
+          status: Database["public"]["Enums"]["booking_status"]
+          total_price: number | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          address_id: string
+          admin_notes?: string | null
+          created_at?: string
+          id?: string
+          notes?: string | null
+          scheduled_date: string
+          scheduled_time?: string | null
+          status?: Database["public"]["Enums"]["booking_status"]
+          total_price?: number | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          address_id?: string
+          admin_notes?: string | null
+          created_at?: string
+          id?: string
+          notes?: string | null
+          scheduled_date?: string
+          scheduled_time?: string | null
+          status?: Database["public"]["Enums"]["booking_status"]
+          total_price?: number | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bookings_address_id_fkey"
+            columns: ["address_id"]
+            isOneToOne: false
+            referencedRelation: "addresses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          full_name: string | null
+          id: string
+          phone: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          full_name?: string | null
+          id?: string
+          phone?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          full_name?: string | null
+          id?: string
+          phone?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      address_status: "pending" | "verified" | "rejected"
+      app_role: "admin" | "user"
+      booking_status: "pending" | "confirmed" | "completed" | "cancelled"
+      slope_type: "flat" | "mild" | "steep"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +319,11 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      address_status: ["pending", "verified", "rejected"],
+      app_role: ["admin", "user"],
+      booking_status: ["pending", "confirmed", "completed", "cancelled"],
+      slope_type: ["flat", "mild", "steep"],
+    },
   },
 } as const
