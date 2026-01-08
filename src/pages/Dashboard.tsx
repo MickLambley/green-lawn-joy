@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import AddAddressDialog from "@/components/dashboard/AddAddressDialog";
+import BookingDialog from "@/components/dashboard/BookingDialog";
 import type { Database } from "@/integrations/supabase/types";
 
 type Address = Database["public"]["Tables"]["addresses"]["Row"];
@@ -33,6 +34,8 @@ const Dashboard = () => {
   const [activeTab, setActiveTab] = useState<"overview" | "addresses" | "bookings">("overview");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [addressDialogOpen, setAddressDialogOpen] = useState(false);
+  const [bookingDialogOpen, setBookingDialogOpen] = useState(false);
+  const [selectedAddressForBooking, setSelectedAddressForBooking] = useState<Address | null>(null);
   const [addresses, setAddresses] = useState<Address[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [isAdmin, setIsAdmin] = useState(false);
@@ -119,6 +122,18 @@ const Dashboard = () => {
     if (user) {
       fetchUserData(user.id);
     }
+  };
+
+  const openBookingDialog = (address: Address) => {
+    setSelectedAddressForBooking(address);
+    setBookingDialogOpen(true);
+  };
+
+  const handleBookingSuccess = () => {
+    if (user) {
+      fetchUserData(user.id);
+    }
+    toast.success("Booking created successfully!");
   };
 
   const getStatusBadge = (status: string) => {
@@ -470,7 +485,7 @@ const Dashboard = () => {
                           <p className="text-sm text-muted-foreground">
                             {address.city}, {address.state} {address.postal_code}
                           </p>
-                          <div className="flex flex-wrap gap-3 mt-3 text-sm text-muted-foreground">
+                        <div className="flex flex-wrap gap-3 mt-3 text-sm text-muted-foreground">
                             <span>Slope: {getSlopeLabel(address.slope)}</span>
                             <span>•</span>
                             <span>Tiers: {address.tier_count}</span>
@@ -481,20 +496,10 @@ const Dashboard = () => {
                               </>
                             )}
                           </div>
-                          {address.status === "verified" && address.fixed_price && address.price_per_sqm && (
-                            <div className="mt-3 p-3 bg-primary/5 rounded-lg">
-                              <p className="text-sm font-medium text-primary">
-                                Price per mow: ${(
-                                  (Number(address.fixed_price) || 0) +
-                                  (Number(address.square_meters) || 0) * (Number(address.price_per_sqm) || 0)
-                                ).toFixed(2)}
-                              </p>
-                            </div>
-                          )}
                         </div>
                       </div>
                       {address.status === "verified" && (
-                        <Button size="sm">
+                        <Button size="sm" onClick={() => openBookingDialog(address)}>
                           <Calendar className="w-4 h-4" />
                           Book Now
                         </Button>
@@ -533,7 +538,7 @@ const Dashboard = () => {
                     : "Once you have a verified address, you can book lawn care services. Add an address first to get started."}
                 </p>
                 {verifiedAddresses.length > 0 ? (
-                  <Button>
+                  <Button onClick={() => openBookingDialog(verifiedAddresses[0])}>
                     <Calendar className="w-4 h-4" />
                     Book Your First Service
                   </Button>
@@ -595,6 +600,16 @@ const Dashboard = () => {
         onOpenChange={setAddressDialogOpen}
         onSuccess={handleAddressAdded}
       />
+
+      {/* Booking Dialog */}
+      {selectedAddressForBooking && (
+        <BookingDialog
+          open={bookingDialogOpen}
+          onOpenChange={setBookingDialogOpen}
+          address={selectedAddressForBooking}
+          onSuccess={handleBookingSuccess}
+        />
+      )}
     </div>
   );
 };
