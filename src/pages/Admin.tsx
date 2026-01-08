@@ -15,6 +15,13 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Table,
   TableBody,
   TableCell,
@@ -28,15 +35,14 @@ import type { Database } from "@/integrations/supabase/types";
 
 type Address = Database["public"]["Tables"]["addresses"]["Row"];
 type Booking = Database["public"]["Tables"]["bookings"]["Row"];
-type Profile = Database["public"]["Tables"]["profiles"]["Row"];
 
 interface AddressWithProfile extends Address {
-  profiles?: Profile | null;
+  customerName?: string;
 }
 
 interface BookingWithDetails extends Booking {
-  profiles?: Profile | null;
-  addresses?: { street_address: string; city: string } | null;
+  customerName?: string;
+  addressDetails?: { street_address: string; city: string };
 }
 
 const Admin = () => {
@@ -56,6 +62,8 @@ const Admin = () => {
   const [pricePerSqm, setPricePerSqm] = useState("");
   const [fixedPrice, setFixedPrice] = useState("");
   const [adminNotes, setAdminNotes] = useState("");
+  const [editSlope, setEditSlope] = useState<"flat" | "mild" | "steep">("flat");
+  const [editTierCount, setEditTierCount] = useState("1");
 
   useEffect(() => {
     checkAdminAccess();
@@ -91,24 +99,41 @@ const Admin = () => {
   };
 
   const fetchData = async () => {
-    // Fetch addresses with user profiles
+    // Fetch all addresses
     const { data: addressData } = await supabase
       .from("addresses")
-      .select(`*, profiles!addresses_user_id_fkey(*)`)
+      .select("*")
       .order("created_at", { ascending: false });
 
+    // Fetch all profiles to map user_id to names
+    const { data: profilesData } = await supabase
+      .from("profiles")
+      .select("user_id, full_name");
+
+    const profileMap = new Map(profilesData?.map(p => [p.user_id, p.full_name]) || []);
+
     if (addressData) {
-      setAddresses(addressData as unknown as AddressWithProfile[]);
+      const addressesWithNames = addressData.map(addr => ({
+        ...addr,
+        customerName: profileMap.get(addr.user_id) || "Unknown"
+      }));
+      setAddresses(addressesWithNames);
     }
 
-    // Fetch bookings with user profiles and addresses
+    // Fetch bookings
     const { data: bookingData } = await supabase
       .from("bookings")
-      .select(`*, profiles!bookings_user_id_fkey(*), addresses!bookings_address_id_fkey(street_address, city)`)
+      .select("*")
       .order("scheduled_date", { ascending: true });
 
-    if (bookingData) {
-      setBookings(bookingData as unknown as BookingWithDetails[]);
+    if (bookingData && addressData) {
+      const addressMap = new Map(addressData.map(a => [a.id, { street_address: a.street_address, city: a.city }]));
+      const bookingsWithDetails = bookingData.map(b => ({
+        ...b,
+        customerName: profileMap.get(b.user_id) || "Unknown",
+        addressDetails: addressMap.get(b.address_id)
+      }));
+      setBookings(bookingsWithDetails);
     }
   };
 
@@ -123,6 +148,8 @@ const Admin = () => {
     setPricePerSqm(address.price_per_sqm?.toString() || "");
     setFixedPrice(address.fixed_price?.toString() || "");
     setAdminNotes(address.admin_notes || "");
+    setEditSlope(address.slope);
+    setEditTierCount(address.tier_count.toString());
     setVerifyDialogOpen(true);
   };
 
@@ -142,6 +169,8 @@ const Admin = () => {
       updateData.square_meters = squareMeters ? parseFloat(squareMeters) : null;
       updateData.price_per_sqm = pricePerSqm ? parseFloat(pricePerSqm) : null;
       updateData.fixed_price = fixedPrice ? parseFloat(fixedPrice) : null;
+      updateData.slope = editSlope;
+      updateData.tier_count = parseInt(editTierCount);
     }
 
     const { error } = await supabase
@@ -350,7 +379,7 @@ const Admin = () => {
                     <TableBody>
                       {addresses.map((address) => (
                         <TableRow key={address.id}>
-                          <TableCell>{address.profiles?.full_name || "Unknown"}</TableCell>
+                          <TableCell>{address.customerName || "Unknown"}</TableCell>
                           <TableCell>
                             <div>
                               <p className="font-medium">{address.street_address}</p>
@@ -404,9 +433,9 @@ const Admin = () => {
                     <TableBody>
                       {bookings.map((booking) => (
                         <TableRow key={booking.id}>
-                          <TableCell>{booking.profiles?.full_name || "Unknown"}</TableCell>
+                          <TableCell>{booking.customerName || "Unknown"}</TableCell>
                           <TableCell>
-                            {booking.addresses?.street_address}, {booking.addresses?.city}
+                            {booking.addressDetails?.street_address}, {booking.addressDetails?.city}
                           </TableCell>
                           <TableCell>
                             {new Date(booking.scheduled_date).toLocaleDateString()}
@@ -460,13 +489,33 @@ const Admin = () => {
               </div>
 
               <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label className="text-sm text-muted-foreground">Slope</Label>
-                  <p className="font-medium">{getSlopeLabel(selectedAddress.slope)}</p>
+                <div className="space-y-2">
+                  <Label>Land Slope</Label>
+                  <Select value={editSlope} onValueChange={(val) => setEditSlope(val as "flat" | "mild" | "steep")}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="flat">Flat</SelectItem>
+                      <SelectItem value="mild">Mild slope</SelectItem>
+                      <SelectItem value="steep">Steep slope</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
-                <div>
-                  <Label className="text-sm text-muted-foreground">Number of Tiers</Label>
-                  <p className="font-medium">{selectedAddress.tier_count}</p>
+                <div className="space-y-2">
+                  <Label>Number of Tiers</Label>
+                  <Select value={editTierCount} onValueChange={setEditTierCount}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((num) => (
+                        <SelectItem key={num} value={num.toString()}>
+                          {num} {num === 1 ? "tier" : "tiers"}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
 
@@ -560,9 +609,9 @@ const Admin = () => {
               <div className="space-y-2">
                 <h4 className="font-medium">Booking Details</h4>
                 <div className="p-4 bg-muted rounded-lg space-y-2">
-                  <p><strong>Customer:</strong> {selectedBooking.profiles?.full_name || "Unknown"}</p>
+                  <p><strong>Customer:</strong> {selectedBooking.customerName || "Unknown"}</p>
                   <p>
-                    <strong>Address:</strong> {selectedBooking.addresses?.street_address}, {selectedBooking.addresses?.city}
+                    <strong>Address:</strong> {selectedBooking.addressDetails?.street_address}, {selectedBooking.addressDetails?.city}
                   </p>
                   <p>
                     <strong>Date:</strong> {new Date(selectedBooking.scheduled_date).toLocaleDateString()}
