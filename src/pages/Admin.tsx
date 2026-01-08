@@ -30,7 +30,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
-import { Leaf, LogOut, MapPin, Calendar, Check, X, Eye } from "lucide-react";
+import { Leaf, LogOut, MapPin, Calendar, Check, X, Eye, Settings } from "lucide-react";
+import PricingSettingsTab from "@/components/admin/PricingSettingsTab";
 import type { Database } from "@/integrations/supabase/types";
 
 type Address = Database["public"]["Tables"]["addresses"]["Row"];
@@ -57,10 +58,8 @@ const Admin = () => {
   const [verifyDialogOpen, setVerifyDialogOpen] = useState(false);
   const [bookingDialogOpen, setBookingDialogOpen] = useState(false);
   
-  // Verification form state
+  // Verification form state - only slope, tiers, and square meters
   const [squareMeters, setSquareMeters] = useState("");
-  const [pricePerSqm, setPricePerSqm] = useState("");
-  const [fixedPrice, setFixedPrice] = useState("");
   const [adminNotes, setAdminNotes] = useState("");
   const [editSlope, setEditSlope] = useState<"flat" | "mild" | "steep">("flat");
   const [editTierCount, setEditTierCount] = useState("1");
@@ -145,8 +144,6 @@ const Admin = () => {
   const openVerifyDialog = (address: AddressWithProfile) => {
     setSelectedAddress(address);
     setSquareMeters(address.square_meters?.toString() || "");
-    setPricePerSqm(address.price_per_sqm?.toString() || "");
-    setFixedPrice(address.fixed_price?.toString() || "");
     setAdminNotes(address.admin_notes || "");
     setEditSlope(address.slope);
     setEditTierCount(address.tier_count.toString());
@@ -167,8 +164,6 @@ const Admin = () => {
 
     if (status === "verified") {
       updateData.square_meters = squareMeters ? parseFloat(squareMeters) : null;
-      updateData.price_per_sqm = pricePerSqm ? parseFloat(pricePerSqm) : null;
-      updateData.fixed_price = fixedPrice ? parseFloat(fixedPrice) : null;
       updateData.slope = editSlope;
       updateData.tier_count = parseInt(editTierCount);
     }
@@ -354,6 +349,10 @@ const Admin = () => {
                 <Badge variant="secondary" className="ml-1">{pendingBookings.length}</Badge>
               )}
             </TabsTrigger>
+            <TabsTrigger value="pricing" className="flex items-center gap-2">
+              <Settings className="w-4 h-4" />
+              Pricing
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="addresses">
@@ -466,6 +465,14 @@ const Admin = () => {
               </CardContent>
             </Card>
           </TabsContent>
+
+          <TabsContent value="pricing">
+            <Card>
+              <CardContent className="pt-6">
+                <PricingSettingsTab />
+              </CardContent>
+            </Card>
+          </TabsContent>
         </Tabs>
       </main>
 
@@ -519,54 +526,15 @@ const Admin = () => {
                 </div>
               </div>
 
-              <div className="space-y-4">
-                <h4 className="font-medium">Set Pricing</h4>
-                <div className="grid grid-cols-3 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="squareMeters">Square Meters</Label>
-                    <Input
-                      id="squareMeters"
-                      type="number"
-                      value={squareMeters}
-                      onChange={(e) => setSquareMeters(e.target.value)}
-                      placeholder="0"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="fixedPrice">Fixed Price ($)</Label>
-                    <Input
-                      id="fixedPrice"
-                      type="number"
-                      step="0.01"
-                      value={fixedPrice}
-                      onChange={(e) => setFixedPrice(e.target.value)}
-                      placeholder="0.00"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="pricePerSqm">Price/m² ($)</Label>
-                    <Input
-                      id="pricePerSqm"
-                      type="number"
-                      step="0.01"
-                      value={pricePerSqm}
-                      onChange={(e) => setPricePerSqm(e.target.value)}
-                      placeholder="0.00"
-                    />
-                  </div>
-                </div>
-
-                {squareMeters && (fixedPrice || pricePerSqm) && (
-                  <div className="p-3 bg-primary/10 rounded-lg">
-                    <p className="text-sm font-medium">
-                      Estimated Total: $
-                      {(
-                        (parseFloat(fixedPrice) || 0) +
-                        (parseFloat(squareMeters) || 0) * (parseFloat(pricePerSqm) || 0)
-                      ).toFixed(2)}
-                    </p>
-                  </div>
-                )}
+              <div className="space-y-2">
+                <Label htmlFor="squareMeters">Total Square Meters</Label>
+                <Input
+                  id="squareMeters"
+                  type="number"
+                  value={squareMeters}
+                  onChange={(e) => setSquareMeters(e.target.value)}
+                  placeholder="Enter lawn size in m²"
+                />
               </div>
 
               <div className="space-y-2">

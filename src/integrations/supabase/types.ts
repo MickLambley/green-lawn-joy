@@ -81,12 +81,26 @@ export type Database = {
         Row: {
           address_id: string
           admin_notes: string | null
+          alternative_date: string | null
+          alternative_suggested_at: string | null
+          alternative_suggested_by: string | null
+          alternative_time_slot: string | null
+          clippings_removal: boolean
+          contractor_accepted_at: string | null
+          contractor_id: string | null
           created_at: string
+          grass_length: string
           id: string
+          is_public_holiday: boolean
+          is_weekend: boolean
           notes: string | null
+          payment_intent_id: string | null
+          payment_status: string
+          quote_breakdown: Json | null
           scheduled_date: string
           scheduled_time: string | null
           status: Database["public"]["Enums"]["booking_status"]
+          time_slot: string
           total_price: number | null
           updated_at: string
           user_id: string
@@ -94,12 +108,26 @@ export type Database = {
         Insert: {
           address_id: string
           admin_notes?: string | null
+          alternative_date?: string | null
+          alternative_suggested_at?: string | null
+          alternative_suggested_by?: string | null
+          alternative_time_slot?: string | null
+          clippings_removal?: boolean
+          contractor_accepted_at?: string | null
+          contractor_id?: string | null
           created_at?: string
+          grass_length?: string
           id?: string
+          is_public_holiday?: boolean
+          is_weekend?: boolean
           notes?: string | null
+          payment_intent_id?: string | null
+          payment_status?: string
+          quote_breakdown?: Json | null
           scheduled_date: string
           scheduled_time?: string | null
           status?: Database["public"]["Enums"]["booking_status"]
+          time_slot?: string
           total_price?: number | null
           updated_at?: string
           user_id: string
@@ -107,12 +135,26 @@ export type Database = {
         Update: {
           address_id?: string
           admin_notes?: string | null
+          alternative_date?: string | null
+          alternative_suggested_at?: string | null
+          alternative_suggested_by?: string | null
+          alternative_time_slot?: string | null
+          clippings_removal?: boolean
+          contractor_accepted_at?: string | null
+          contractor_id?: string | null
           created_at?: string
+          grass_length?: string
           id?: string
+          is_public_holiday?: boolean
+          is_weekend?: boolean
           notes?: string | null
+          payment_intent_id?: string | null
+          payment_status?: string
+          quote_breakdown?: Json | null
           scheduled_date?: string
           scheduled_time?: string | null
           status?: Database["public"]["Enums"]["booking_status"]
+          time_slot?: string
           total_price?: number | null
           updated_at?: string
           user_id?: string
@@ -126,6 +168,66 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      contractors: {
+        Row: {
+          business_name: string | null
+          created_at: string
+          id: string
+          is_active: boolean
+          phone: string | null
+          service_areas: string[]
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          business_name?: string | null
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          phone?: string | null
+          service_areas?: string[]
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          business_name?: string | null
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          phone?: string | null
+          service_areas?: string[]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      pricing_settings: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          key: string
+          updated_at: string
+          value: number
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          key: string
+          updated_at?: string
+          value?: number
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          key?: string
+          updated_at?: string
+          value?: number
+        }
+        Relationships: []
       }
       profiles: {
         Row: {
@@ -190,7 +292,7 @@ export type Database = {
     }
     Enums: {
       address_status: "pending" | "verified" | "rejected"
-      app_role: "admin" | "user"
+      app_role: "admin" | "user" | "contractor"
       booking_status: "pending" | "confirmed" | "completed" | "cancelled"
       slope_type: "flat" | "mild" | "steep"
     }
@@ -321,7 +423,7 @@ export const Constants = {
   public: {
     Enums: {
       address_status: ["pending", "verified", "rejected"],
-      app_role: ["admin", "user"],
+      app_role: ["admin", "user", "contractor"],
       booking_status: ["pending", "confirmed", "completed", "cancelled"],
       slope_type: ["flat", "mild", "steep"],
     },
