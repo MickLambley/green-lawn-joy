@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { Loader2, Calculator, CreditCard, Ruler, Scissors, Clock, CalendarDays } from "lucide-react";
+import PaymentDialog from "./PaymentDialog";
 import type { Database } from "@/integrations/supabase/types";
 
 type Address = Database["public"]["Tables"]["addresses"]["Row"];
@@ -66,9 +67,11 @@ const timeSlots = [
 ];
 
 const BookingDialog = ({ open, onOpenChange, address, onSuccess }: BookingDialogProps) => {
-  const [step, setStep] = useState<"form" | "quote" | "payment">("form");
+  const [step, setStep] = useState<"form" | "quote">("form");
   const [loading, setLoading] = useState(false);
   const [pricingSettings, setPricingSettings] = useState<PricingSettings | null>(null);
+  const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
+  const [createdBookingId, setCreatedBookingId] = useState<string | null>(null);
   
   // Form state
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
@@ -176,7 +179,7 @@ const BookingDialog = ({ open, onOpenChange, address, onSuccess }: BookingDialog
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
 
-      const { error } = await supabase.from("bookings").insert([{
+      const { data, error } = await supabase.from("bookings").insert([{
         user_id: user.id,
         address_id: address.id,
         scheduled_date: selectedDate.toISOString().split("T")[0],
@@ -190,13 +193,12 @@ const BookingDialog = ({ open, onOpenChange, address, onSuccess }: BookingDialog
         quote_breakdown: JSON.parse(JSON.stringify(quote)),
         status: "pending" as const,
         payment_status: "unpaid",
-      }]);
+      }]).select().single();
 
       if (error) throw error;
 
-      toast.success("Booking request submitted!");
-      onSuccess();
-      onOpenChange(false);
+      setCreatedBookingId(data.id);
+      setPaymentDialogOpen(true);
     } catch (error) {
       console.error("Booking error:", error);
       toast.error("Failed to create booking");
@@ -205,17 +207,31 @@ const BookingDialog = ({ open, onOpenChange, address, onSuccess }: BookingDialog
     }
   };
 
+  const handlePaymentSuccess = async () => {
+    if (!createdBookingId) return;
+
+    // Update booking payment status
+    await supabase
+      .from("bookings")
+      .update({ payment_status: "paid" })
+      .eq("id", createdBookingId);
+
+    setPaymentDialogOpen(false);
+    toast.success("Booking confirmed! A contractor will be assigned soon.");
+    onSuccess();
+    onOpenChange(false);
+  };
+
   const disabledDays = { before: new Date() };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
+            <DialogTitle className="flex items-center gap-2">
             <CalendarDays className="w-5 h-5 text-primary" />
             {step === "form" && "Book Lawn Service"}
             {step === "quote" && "Your Quote"}
-            {step === "payment" && "Payment"}
           </DialogTitle>
         </DialogHeader>
 
@@ -399,6 +415,19 @@ const BookingDialog = ({ open, onOpenChange, address, onSuccess }: BookingDialog
           </div>
         )}
       </DialogContent>
+
+      {/* Payment Dialog */}
+      <PaymentDialog
+        open={paymentDialogOpen}
+        onOpenChange={setPaymentDialogOpen}
+        amount={quote?.total || 0}
+        onPaymentSuccess={handlePaymentSuccess}
+        bookingDetails={{
+          date: selectedDate?.toLocaleDateString("en-AU", { weekday: "long", month: "long", day: "numeric" }) || "",
+          timeSlot: timeSlots.find(s => s.value === timeSlot)?.label || timeSlot,
+          address: `${address.street_address}, ${address.city}`,
+        }}
+      />
     </Dialog>
   );
 };
