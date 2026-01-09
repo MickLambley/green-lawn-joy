@@ -250,15 +250,6 @@ const Dashboard = () => {
             <Calendar className="w-5 h-5" />
             <span className="font-medium">My Bookings</span>
           </button>
-          {isAdmin && (
-            <button
-              onClick={() => navigate("/admin")}
-              className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-colors text-muted-foreground hover:bg-muted hover:text-foreground"
-            >
-              <Shield className="w-5 h-5" />
-              <span className="font-medium">Admin Portal</span>
-            </button>
-          )}
         </nav>
 
         {/* Bottom Actions */}

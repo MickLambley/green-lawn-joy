@@ -78,7 +78,20 @@ const ContractorDashboard = () => {
 
     setUser(user);
 
-    // Check if user is a contractor
+    // Check if user has contractor role
+    const { data: roles } = await supabase
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", user.id)
+      .eq("role", "contractor");
+
+    if (!roles || roles.length === 0) {
+      toast.error("You don't have contractor access");
+      navigate("/auth");
+      return;
+    }
+
+    // Check if user has a contractor profile
     const { data: contractorData } = await supabase
       .from("contractors")
       .select("*")
@@ -86,8 +99,8 @@ const ContractorDashboard = () => {
       .single();
 
     if (!contractorData) {
-      toast.error("You don't have contractor access");
-      navigate("/dashboard");
+      toast.error("Contractor profile not found");
+      navigate("/auth");
       return;
     }
 
