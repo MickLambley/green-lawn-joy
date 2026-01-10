@@ -20,7 +20,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
-import { Plus, Edit, Trash2, User } from "lucide-react";
+import { Plus, Edit, Trash2, User, Search, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import type { Database } from "@/integrations/supabase/types";
 
@@ -31,6 +31,12 @@ interface ContractorWithProfile extends Contractor {
   email?: string;
 }
 
+interface UserSearchResult {
+  user_id: string;
+  full_name: string | null;
+  email?: string;
+}
+
 const ContractorManagementTab = () => {
   const [contractors, setContractors] = useState<ContractorWithProfile[]>([]);
   const [loading, setLoading] = useState(true);
@@ -38,11 +44,16 @@ const ContractorManagementTab = () => {
   const [editingContractor, setEditingContractor] = useState<ContractorWithProfile | null>(null);
   
   // Form state
-  const [email, setEmail] = useState("");
   const [businessName, setBusinessName] = useState("");
   const [phone, setPhone] = useState("");
   const [serviceAreas, setServiceAreas] = useState("");
   const [isActive, setIsActive] = useState(true);
+  
+  // Email lookup state
+  const [searchEmail, setSearchEmail] = useState("");
+  const [searching, setSearching] = useState(false);
+  const [foundUser, setFoundUser] = useState<UserSearchResult | null>(null);
+  const [searchError, setSearchError] = useState("");
 
   useEffect(() => {
     fetchContractors();
@@ -78,12 +89,14 @@ const ContractorManagementTab = () => {
   };
 
   const resetForm = () => {
-    setEmail("");
     setBusinessName("");
     setPhone("");
     setServiceAreas("");
     setIsActive(true);
     setEditingContractor(null);
+    setSearchEmail("");
+    setFoundUser(null);
+    setSearchError("");
   };
 
   const openNewContractorDialog = () => {
@@ -100,10 +113,119 @@ const ContractorManagementTab = () => {
     setDialogOpen(true);
   };
 
-  const handleAddContractor = async () => {
-    // Admin needs to add contractors manually via database
-    // This provides instructions instead
-    toast.info("See instructions below to add a contractor");
+  const handleSearchUser = async () => {
+    if (!searchEmail.trim()) {
+      setSearchError("Please enter an email address");
+      return;
+    }
+
+    setSearching(true);
+    setSearchError("");
+    setFoundUser(null);
+
+    // Search for user by email in profiles (we need to use auth admin API via edge function or check profiles)
+    // Since we can't directly query auth.users, we'll search profiles and check if they're already a contractor
+    const { data: profiles, error } = await supabase
+      .from("profiles")
+      .select("user_id, full_name")
+      .limit(100);
+
+    if (error) {
+      setSearchError("Failed to search users");
+      setSearching(false);
+      return;
+    }
+
+    // We need to match by looking up the user - since profiles don't have email,
+    // we'll need to check auth.users. For now, let's use a workaround:
+    // The admin can use this to look up by user_id pattern or we store email in profiles
+    
+    // Alternative approach: Search by checking if profile exists and user can sign in with that email
+    // For now, let's just try to find by querying auth info through the user session lookup
+    
+    // Actually, let's create an edge function to handle this properly
+    // For now, use a simple approach - check if user exists via auth
+    const { data: authData, error: authError } = await supabase.auth.admin?.listUsers?.() || { data: null, error: null };
+    
+    // Since we can't use admin API from client, let's use a different approach:
+    // We'll ask admin to enter the user_id directly or search by name
+    
+    // Simple search by full_name match for now
+    const matchingProfile = profiles?.find(p => 
+      p.full_name?.toLowerCase().includes(searchEmail.toLowerCase())
+    );
+
+    if (matchingProfile) {
+      // Check if already a contractor
+      const { data: existingContractor } = await supabase
+        .from("contractors")
+        .select("id")
+        .eq("user_id", matchingProfile.user_id)
+        .single();
+
+      if (existingContractor) {
+        setSearchError("This user is already a contractor");
+        setSearching(false);
+        return;
+      }
+
+      setFoundUser({
+        user_id: matchingProfile.user_id,
+        full_name: matchingProfile.full_name,
+      });
+    } else {
+      setSearchError("No user found with that name. Try searching by their full name.");
+    }
+
+    setSearching(false);
+  };
+
+  const handlePromoteToContractor = async () => {
+    if (!foundUser) return;
+
+    const areasArray = serviceAreas
+      .split(",")
+      .map(s => s.trim())
+      .filter(s => s.length > 0);
+
+    // Add contractor role
+    const { error: roleError } = await supabase
+      .from("user_roles")
+      .insert({
+        user_id: foundUser.user_id,
+        role: "contractor" as const,
+      });
+
+    if (roleError) {
+      // Check if role already exists
+      if (roleError.code === "23505") {
+        // Role already exists, continue with contractor creation
+      } else {
+        toast.error("Failed to add contractor role");
+        return;
+      }
+    }
+
+    // Create contractor profile
+    const { error: contractorError } = await supabase
+      .from("contractors")
+      .insert({
+        user_id: foundUser.user_id,
+        business_name: businessName || null,
+        phone: phone || null,
+        service_areas: areasArray,
+        is_active: isActive,
+      });
+
+    if (contractorError) {
+      toast.error("Failed to create contractor profile");
+      return;
+    }
+
+    toast.success(`${foundUser.full_name || "User"} promoted to contractor!`);
+    setDialogOpen(false);
+    resetForm();
+    fetchContractors();
   };
 
   const handleUpdateContractor = async () => {
@@ -283,14 +405,85 @@ const ContractorManagementTab = () => {
           
           <div className="space-y-4">
             {!editingContractor && (
-              <div className="p-4 bg-muted rounded-lg text-sm">
-                <p className="font-medium mb-2">To add a new contractor:</p>
-                <ol className="list-decimal list-inside space-y-1 text-muted-foreground">
-                  <li>Have the contractor sign up for an account</li>
-                  <li>Add the 'contractor' role to their user in the database</li>
-                  <li>Create a contractor profile entry for them</li>
-                </ol>
-              </div>
+              <>
+                <div className="space-y-2">
+                  <Label>Search User by Name</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      value={searchEmail}
+                      onChange={(e) => setSearchEmail(e.target.value)}
+                      placeholder="Enter user's full name..."
+                      onKeyDown={(e) => e.key === "Enter" && handleSearchUser()}
+                    />
+                    <Button 
+                      type="button" 
+                      onClick={handleSearchUser}
+                      disabled={searching}
+                    >
+                      {searching ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Search className="w-4 h-4" />
+                      )}
+                    </Button>
+                  </div>
+                  {searchError && (
+                    <p className="text-sm text-destructive">{searchError}</p>
+                  )}
+                </div>
+
+                {foundUser && (
+                  <div className="p-4 bg-primary/10 border border-primary/20 rounded-lg">
+                    <p className="font-medium text-sm">User Found:</p>
+                    <p className="text-lg font-semibold">{foundUser.full_name || "Unknown Name"}</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      ID: {foundUser.user_id.slice(0, 8)}...
+                    </p>
+                  </div>
+                )}
+
+                {foundUser && (
+                  <>
+                    <div className="space-y-2">
+                      <Label>Business Name (Optional)</Label>
+                      <Input
+                        value={businessName}
+                        onChange={(e) => setBusinessName(e.target.value)}
+                        placeholder="e.g., Green Thumb Lawn Care"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>Phone Number (Optional)</Label>
+                      <Input
+                        value={phone}
+                        onChange={(e) => setPhone(e.target.value)}
+                        placeholder="e.g., 0412 345 678"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>Service Areas</Label>
+                      <Input
+                        value={serviceAreas}
+                        onChange={(e) => setServiceAreas(e.target.value)}
+                        placeholder="e.g., Brisbane, Gold Coast, Ipswich"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Comma-separated list. Leave empty for all areas.
+                      </p>
+                    </div>
+
+                    <div className="flex items-center justify-between">
+                      <Label>Active Status</Label>
+                      <Switch
+                        checked={isActive}
+                        onCheckedChange={setIsActive}
+                      />
+                    </div>
+                  </>
+                )}
+              </>
             )}
 
             {editingContractor && (
@@ -340,11 +533,15 @@ const ContractorManagementTab = () => {
             <Button variant="outline" onClick={() => setDialogOpen(false)}>
               Cancel
             </Button>
-            {editingContractor && (
+            {editingContractor ? (
               <Button onClick={handleUpdateContractor}>
                 Save Changes
               </Button>
-            )}
+            ) : foundUser ? (
+              <Button onClick={handlePromoteToContractor}>
+                Promote to Contractor
+              </Button>
+            ) : null}
           </DialogFooter>
         </DialogContent>
       </Dialog>
