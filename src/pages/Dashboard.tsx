@@ -13,7 +13,6 @@ import {
   LogOut,
   Home,
   Settings,
-  Bell,
   ChevronRight,
   Menu,
   X,
@@ -22,6 +21,8 @@ import {
 import { toast } from "sonner";
 import AddAddressDialog from "@/components/dashboard/AddAddressDialog";
 import BookingDialog from "@/components/dashboard/BookingDialog";
+import NotificationsPopover from "@/components/dashboard/NotificationsPopover";
+import CompletedServicesDialog from "@/components/dashboard/CompletedServicesDialog";
 import type { Database } from "@/integrations/supabase/types";
 
 type Address = Database["public"]["Tables"]["addresses"]["Row"];
@@ -35,7 +36,8 @@ const Dashboard = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [addressDialogOpen, setAddressDialogOpen] = useState(false);
   const [bookingDialogOpen, setBookingDialogOpen] = useState(false);
-  const [selectedAddressForBooking, setSelectedAddressForBooking] = useState<Address | null>(null);
+  const [completedServicesDialogOpen, setCompletedServicesDialogOpen] = useState(false);
+  const [selectedAddressIdForBooking, setSelectedAddressIdForBooking] = useState<string | undefined>(undefined);
   const [addresses, setAddresses] = useState<Address[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [isAdmin, setIsAdmin] = useState(false);
@@ -124,8 +126,8 @@ const Dashboard = () => {
     }
   };
 
-  const openBookingDialog = (address: Address) => {
-    setSelectedAddressForBooking(address);
+  const openBookingDialog = (addressId?: string) => {
+    setSelectedAddressIdForBooking(addressId);
     setBookingDialogOpen(true);
   };
 
@@ -133,7 +135,6 @@ const Dashboard = () => {
     if (user) {
       fetchUserData(user.id);
     }
-    toast.success("Booking created successfully!");
   };
 
   const getStatusBadge = (status: string) => {

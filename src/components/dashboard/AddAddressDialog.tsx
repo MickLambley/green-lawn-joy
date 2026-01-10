@@ -29,6 +29,7 @@ import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { MapPin, Loader2 } from "lucide-react";
+import AddressAutocompleteInput from "./AddressAutocompleteInput";
 
 const addressSchema = z.object({
   street_address: z
@@ -83,6 +84,18 @@ const AddAddressDialog = ({ open, onOpenChange, onSuccess }: AddAddressDialogPro
       tier_count: 1,
     },
   });
+
+  const handleAddressSelect = (address: {
+    street_address: string;
+    city: string;
+    state: string;
+    postal_code: string;
+  }) => {
+    form.setValue("street_address", address.street_address);
+    form.setValue("city", address.city);
+    form.setValue("state", address.state);
+    form.setValue("postal_code", address.postal_code);
+  };
 
   const onSubmit = async (data: AddressFormData) => {
     setIsSubmitting(true);
@@ -150,7 +163,12 @@ const AddAddressDialog = ({ open, onOpenChange, onSuccess }: AddAddressDialogPro
                 <FormItem>
                   <FormLabel>Street Address</FormLabel>
                   <FormControl>
-                    <Input placeholder="123 Main Street" {...field} />
+                    <AddressAutocompleteInput
+                      value={field.value}
+                      onChange={field.onChange}
+                      onSelectAddress={handleAddressSelect}
+                      placeholder="Start typing your address..."
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
