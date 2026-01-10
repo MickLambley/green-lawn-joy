@@ -192,6 +192,19 @@ const Admin = () => {
     fetchData();
   };
 
+  const sendBookingEmail = async (bookingId: string, emailType: "created" | "confirmed" | "updated" | "cancelled") => {
+    try {
+      const { error } = await supabase.functions.invoke("send-booking-email", {
+        body: { bookingId, emailType },
+      });
+      if (error) {
+        console.error("Failed to send email:", error);
+      }
+    } catch (err) {
+      console.error("Email notification error:", err);
+    }
+  };
+
   const handleUpdateBookingStatus = async (bookingId: string, status: "confirmed" | "completed" | "cancelled") => {
     const { error } = await supabase
       .from("bookings")
@@ -205,6 +218,15 @@ const Admin = () => {
         variant: "destructive",
       });
       return;
+    }
+
+    // Send email notification based on status change
+    if (status === "confirmed") {
+      sendBookingEmail(bookingId, "confirmed");
+    } else if (status === "cancelled") {
+      sendBookingEmail(bookingId, "cancelled");
+    } else if (status === "completed") {
+      sendBookingEmail(bookingId, "updated");
     }
 
     toast({

@@ -171,6 +171,19 @@ const BookingDialog = ({ open, onOpenChange, address, onSuccess }: BookingDialog
     }
   };
 
+  const sendBookingEmail = async (bookingId: string, emailType: "created" | "confirmed" | "updated" | "cancelled") => {
+    try {
+      const { error } = await supabase.functions.invoke("send-booking-email", {
+        body: { bookingId, emailType },
+      });
+      if (error) {
+        console.error("Failed to send email:", error);
+      }
+    } catch (err) {
+      console.error("Email notification error:", err);
+    }
+  };
+
   const handleBookNow = async () => {
     if (!selectedDate || !quote) return;
 
@@ -198,6 +211,10 @@ const BookingDialog = ({ open, onOpenChange, address, onSuccess }: BookingDialog
       if (error) throw error;
 
       setCreatedBookingId(data.id);
+      
+      // Send booking created email (non-blocking)
+      sendBookingEmail(data.id, "created");
+      
       setPaymentDialogOpen(true);
     } catch (error) {
       console.error("Booking error:", error);
@@ -215,6 +232,9 @@ const BookingDialog = ({ open, onOpenChange, address, onSuccess }: BookingDialog
       .from("bookings")
       .update({ payment_status: "paid" })
       .eq("id", createdBookingId);
+
+    // Send booking confirmed email (non-blocking)
+    sendBookingEmail(createdBookingId, "confirmed");
 
     setPaymentDialogOpen(false);
     toast.success("Booking confirmed! A contractor will be assigned soon.");
