@@ -14,6 +14,32 @@ interface BookingEmailRequest {
   emailType: "created" | "confirmed" | "updated" | "cancelled";
 }
 
+// Helper function to validate JWT and get user claims
+async function validateAuth(req: Request): Promise<{ userId: string; error?: string }> {
+  const authHeader = req.headers.get("Authorization");
+  
+  if (!authHeader?.startsWith("Bearer ")) {
+    return { userId: "", error: "Missing or invalid authorization header" };
+  }
+
+  const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+  const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+  
+  const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+    global: { headers: { Authorization: authHeader } },
+  });
+
+  const token = authHeader.replace("Bearer ", "");
+  const { data, error } = await supabase.auth.getClaims(token);
+
+  if (error || !data?.claims) {
+    console.error("JWT validation failed:", error);
+    return { userId: "", error: "Invalid or expired token" };
+  }
+
+  return { userId: data.claims.sub as string };
+}
+
 const getEmailContent = (
   emailType: string,
   booking: any,
@@ -122,6 +148,18 @@ serve(async (req) => {
   }
 
   try {
+    // Validate authentication
+    const { userId, error: authError } = await validateAuth(req);
+    if (authError) {
+      console.error("Authentication failed:", authError);
+      return new Response(
+        JSON.stringify({ error: "Unauthorized" }),
+        { status: 401, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
+
+    console.log(`Authenticated user ${userId} requesting email`);
+
     const { bookingId, emailType }: BookingEmailRequest = await req.json();
 
     console.log(`Processing ${emailType} email for booking ${bookingId}`);
