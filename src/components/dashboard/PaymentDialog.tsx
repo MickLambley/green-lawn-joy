@@ -31,7 +31,17 @@ const PaymentDialog = ({
   const [processing, setProcessing] = useState(false);
   const [paymentComplete, setPaymentComplete] = useState(false);
 
+  // Check if we're in production mode (no simulated payments allowed)
+  const isProduction = import.meta.env.PROD;
+  const stripeConfigured = false; // TODO: Set to true when Stripe is integrated
+
   const handlePayment = async () => {
+    // SECURITY: Block simulated payments in production
+    if (isProduction && !stripeConfigured) {
+      console.error("Payment system not configured for production");
+      return;
+    }
+
     setProcessing(true);
     
     // TODO: Integrate with Stripe
@@ -100,8 +110,22 @@ const PaymentDialog = ({
               <div className="p-4 border border-dashed border-border rounded-lg bg-muted/50">
                 <div className="text-center text-muted-foreground">
                   <CreditCard className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                  <p className="text-sm">Stripe payment form will appear here</p>
-                  <p className="text-xs mt-1">Connect Stripe to enable payments</p>
+                  {isProduction && !stripeConfigured ? (
+                    <>
+                      <p className="text-sm text-destructive font-medium">Payment system not available</p>
+                      <p className="text-xs mt-1">Please contact support</p>
+                    </>
+                  ) : (
+                    <>
+                      <p className="text-sm">Stripe payment form will appear here</p>
+                      <p className="text-xs mt-1">Connect Stripe to enable payments</p>
+                      {!isProduction && (
+                        <p className="text-xs mt-2 text-amber-600 dark:text-amber-400">
+                          ⚠️ Development mode - payments are simulated
+                        </p>
+                      )}
+                    </>
+                  )}
                 </div>
               </div>
             </div>
@@ -111,12 +135,17 @@ const PaymentDialog = ({
               className="w-full"
               size="lg"
               onClick={handlePayment}
-              disabled={processing}
+              disabled={processing || (isProduction && !stripeConfigured)}
             >
               {processing ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                   Processing...
+                </>
+              ) : isProduction && !stripeConfigured ? (
+                <>
+                  <Lock className="w-4 h-4 mr-2" />
+                  Payment Unavailable
                 </>
               ) : (
                 <>

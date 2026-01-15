@@ -115,7 +115,12 @@ const ContractorManagementTab = () => {
 
   const handleSearchUser = async () => {
     if (!searchEmail.trim()) {
-      setSearchError("Please enter an email address");
+      setSearchError("Please enter a name to search");
+      return;
+    }
+
+    if (searchEmail.trim().length < 2) {
+      setSearchError("Please enter at least 2 characters");
       return;
     }
 
@@ -123,58 +128,47 @@ const ContractorManagementTab = () => {
     setSearchError("");
     setFoundUser(null);
 
-    // Search for user by email in profiles (we need to use auth admin API via edge function or check profiles)
-    // Since we can't directly query auth.users, we'll search profiles and check if they're already a contractor
-    const { data: profiles, error } = await supabase
-      .from("profiles")
-      .select("user_id, full_name")
-      .limit(100);
+    try {
+      // Use secure edge function for admin user search
+      const { data, error } = await supabase.functions.invoke("admin-search-user", {
+        body: { searchQuery: searchEmail.trim() },
+      });
 
-    if (error) {
-      setSearchError("Failed to search users");
-      setSearching(false);
-      return;
-    }
-
-    // We need to match by looking up the user - since profiles don't have email,
-    // we'll need to check auth.users. For now, let's use a workaround:
-    // The admin can use this to look up by user_id pattern or we store email in profiles
-    
-    // Alternative approach: Search by checking if profile exists and user can sign in with that email
-    // For now, let's just try to find by querying auth info through the user session lookup
-    
-    // Actually, let's create an edge function to handle this properly
-    // For now, use a simple approach - check if user exists via auth
-    const { data: authData, error: authError } = await supabase.auth.admin?.listUsers?.() || { data: null, error: null };
-    
-    // Since we can't use admin API from client, let's use a different approach:
-    // We'll ask admin to enter the user_id directly or search by name
-    
-    // Simple search by full_name match for now
-    const matchingProfile = profiles?.find(p => 
-      p.full_name?.toLowerCase().includes(searchEmail.toLowerCase())
-    );
-
-    if (matchingProfile) {
-      // Check if already a contractor
-      const { data: existingContractor } = await supabase
-        .from("contractors")
-        .select("id")
-        .eq("user_id", matchingProfile.user_id)
-        .single();
-
-      if (existingContractor) {
-        setSearchError("This user is already a contractor");
+      if (error) {
+        console.error("Search error:", error);
+        setSearchError("Failed to search users. Please try again.");
         setSearching(false);
         return;
       }
 
+      if (data.error) {
+        setSearchError(data.error);
+        setSearching(false);
+        return;
+      }
+
+      const users = data.users || [];
+      
+      if (users.length === 0) {
+        setSearchError("No matching users found who aren't already contractors.");
+        setSearching(false);
+        return;
+      }
+
+      // Take the first matching user
+      const matchingUser = users[0];
       setFoundUser({
-        user_id: matchingProfile.user_id,
-        full_name: matchingProfile.full_name,
+        user_id: matchingUser.user_id,
+        full_name: matchingUser.full_name,
       });
-    } else {
-      setSearchError("No user found with that name. Try searching by their full name.");
+
+      // If multiple results, show a note
+      if (users.length > 1) {
+        console.log(`Found ${users.length} matching users, showing first result`);
+      }
+    } catch (err) {
+      console.error("Search failed:", err);
+      setSearchError("An unexpected error occurred. Please try again.");
     }
 
     setSearching(false);
