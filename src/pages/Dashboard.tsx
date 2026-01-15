@@ -17,6 +17,7 @@ import {
   Menu,
   X,
   Shield,
+  Bell,
 } from "lucide-react";
 import { toast } from "sonner";
 import AddAddressDialog from "@/components/dashboard/AddAddressDialog";
@@ -282,16 +283,13 @@ const Dashboard = () => {
             </p>
           </div>
           <div className="flex items-center gap-3">
-            <button className="relative p-2 rounded-xl hover:bg-muted transition-colors">
-              <Bell className="w-5 h-5 text-muted-foreground" />
-              {pendingAddresses.length > 0 && (
-                <span className="absolute top-1 right-1 w-2 h-2 bg-primary rounded-full" />
-              )}
-            </button>
-            <Button size="sm" onClick={openAddressDialog}>
-              <Plus className="w-4 h-4" />
-              <span className="hidden sm:inline">Add Address</span>
-            </Button>
+            {user && <NotificationsPopover userId={user.id} />}
+            {isAdmin && (
+              <Button variant="outline" size="sm" onClick={() => navigate("/admin")}>
+                <Shield className="w-4 h-4" />
+                <span className="hidden sm:inline">Admin</span>
+              </Button>
+            )}
           </div>
         </header>
 
@@ -329,7 +327,10 @@ const Dashboard = () => {
                   </div>
                 </div>
               </div>
-              <div className="bg-card rounded-2xl p-5 md:p-6 shadow-soft sm:col-span-2 lg:col-span-1">
+              <button
+                onClick={() => setCompletedServicesDialogOpen(true)}
+                className="bg-card rounded-2xl p-5 md:p-6 shadow-soft sm:col-span-2 lg:col-span-1 hover:ring-2 hover:ring-primary/30 transition-all cursor-pointer text-left w-full"
+              >
                 <div className="flex items-center gap-4">
                   <div className="w-12 h-12 rounded-xl bg-grass-light/50 flex items-center justify-center">
                     <Clock className="w-6 h-6 text-grass-dark" />
@@ -343,7 +344,7 @@ const Dashboard = () => {
                     </p>
                   </div>
                 </div>
-              </div>
+              </button>
             </div>
 
             {/* Getting Started or Pending Status */}
@@ -491,7 +492,7 @@ const Dashboard = () => {
                         </div>
                       </div>
                       {address.status === "verified" && (
-                        <Button size="sm" onClick={() => openBookingDialog(address)}>
+                        <Button size="sm" onClick={() => openBookingDialog(address.id)}>
                           <Calendar className="w-4 h-4" />
                           Book Now
                         </Button>
@@ -530,7 +531,7 @@ const Dashboard = () => {
                     : "Once you have a verified address, you can book lawn care services. Add an address first to get started."}
                 </p>
                 {verifiedAddresses.length > 0 ? (
-                  <Button onClick={() => openBookingDialog(verifiedAddresses[0])}>
+                  <Button onClick={() => openBookingDialog(verifiedAddresses[0].id)}>
                     <Calendar className="w-4 h-4" />
                     Book Your First Service
                   </Button>
@@ -594,12 +595,21 @@ const Dashboard = () => {
       />
 
       {/* Booking Dialog */}
-      {selectedAddressForBooking && (
-        <BookingDialog
-          open={bookingDialogOpen}
-          onOpenChange={setBookingDialogOpen}
-          address={selectedAddressForBooking}
-          onSuccess={handleBookingSuccess}
+      <BookingDialog
+        open={bookingDialogOpen}
+        onOpenChange={setBookingDialogOpen}
+        addresses={addresses}
+        defaultAddressId={selectedAddressIdForBooking}
+        onSuccess={handleBookingSuccess}
+        onAddressAdded={handleAddressAdded}
+      />
+
+      {/* Completed Services Dialog */}
+      {user && (
+        <CompletedServicesDialog
+          open={completedServicesDialogOpen}
+          onOpenChange={setCompletedServicesDialogOpen}
+          userId={user.id}
         />
       )}
     </div>
