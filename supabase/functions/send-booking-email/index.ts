@@ -178,8 +178,45 @@ serve(async (req) => {
 
     if (bookingError || !booking) {
       console.error("Error fetching booking:", bookingError);
-      throw new Error(`Booking not found: ${bookingId}`);
+      return new Response(
+        JSON.stringify({ error: "Booking not found" }),
+        { status: 404, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
     }
+
+    // Authorization check: verify user owns this booking, is assigned contractor, or is admin
+    const isOwner = booking.user_id === userId;
+
+    // Check if user is the assigned contractor
+    let isContractor = false;
+    if (booking.contractor_id) {
+      const { data: contractor } = await supabase
+        .from("contractors")
+        .select("id")
+        .eq("user_id", userId)
+        .eq("id", booking.contractor_id)
+        .single();
+      isContractor = !!contractor;
+    }
+
+    // Check if user is an admin
+    const { data: adminRole } = await supabase
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", userId)
+      .eq("role", "admin")
+      .single();
+    const isAdmin = !!adminRole;
+
+    if (!isOwner && !isContractor && !isAdmin) {
+      console.error(`Authorization denied: User ${userId} attempted to send email for booking ${bookingId}`);
+      return new Response(
+        JSON.stringify({ error: "Unauthorized to send email for this booking" }),
+        { status: 403, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
+
+    console.log(`Authorization granted: owner=${isOwner}, contractor=${isContractor}, admin=${isAdmin}`);
 
     // Fetch address details
     const { data: address, error: addressError } = await supabase
