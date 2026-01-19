@@ -96,6 +96,7 @@ const BookingDialog = ({ open, onOpenChange, addresses, defaultAddressId, onSucc
   const [addAddressDialogOpen, setAddAddressDialogOpen] = useState(false);
   const [createdBookingId, setCreatedBookingId] = useState<string | null>(null);
   const [contractors, setContractors] = useState<Contractor[]>([]);
+  const [clientSecret, setClientSecret] = useState<string | null>(null);
   
   // Form state
   const [selectedAddressId, setSelectedAddressId] = useState<string>("");
@@ -287,7 +288,7 @@ const BookingDialog = ({ open, onOpenChange, addresses, defaultAddressId, onSucc
         time_slot: timeSlot,
         is_weekend: isWeekend(selectedDate),
         is_public_holiday: false,
-        total_price: quote.total,
+        total_price: totalWithGst,
         quote_breakdown: JSON.parse(JSON.stringify(quote)),
         status: "pending" as const,
         payment_status: "unpaid",
@@ -301,6 +302,19 @@ const BookingDialog = ({ open, onOpenChange, addresses, defaultAddressId, onSucc
       // Send booking created email (non-blocking)
       sendBookingEmail(data.id, "created");
       
+      // Create PaymentIntent via edge function
+      const { data: paymentData, error: paymentError } = await supabase.functions.invoke(
+        "create-payment-intent",
+        {
+          body: { bookingId: data.id, amount: totalWithGst },
+        }
+      );
+
+      if (paymentError || !paymentData?.clientSecret) {
+        throw new Error(paymentError?.message || "Failed to create payment intent");
+      }
+
+      setClientSecret(paymentData.clientSecret);
       setPaymentDialogOpen(true);
     } catch (error) {
       console.error("Booking error:", error);
@@ -600,6 +614,7 @@ const BookingDialog = ({ open, onOpenChange, addresses, defaultAddressId, onSucc
           onOpenChange={setPaymentDialogOpen}
           amount={totalWithGst}
           onPaymentSuccess={handlePaymentSuccess}
+          clientSecret={clientSecret}
           bookingDetails={{
             date: selectedDate?.toLocaleDateString("en-AU", { weekday: "long", month: "long", day: "numeric" }) || "",
             timeSlot: timeSlots.find(s => s.value === timeSlot)?.label || timeSlot,
