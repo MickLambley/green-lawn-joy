@@ -34,16 +34,20 @@ serve(async (req) => {
       throw new Error("STRIPE_SECRET_KEY is not configured");
     }
 
-    const supabase = createClient(supabaseUrl, supabaseAnonKey);
-
     // Authenticate user
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
       throw new Error("No authorization header provided");
     }
 
-    const token = authHeader.replace("Bearer ", "");
-    const { data: userData, error: userError } = await supabase.auth.getUser(token);
+    // Create client with user's auth context for RLS
+    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+      global: {
+        headers: { Authorization: authHeader },
+      },
+    });
+
+    const { data: userData, error: userError } = await supabase.auth.getUser();
     
     if (userError || !userData.user) {
       throw new Error("User not authenticated");
@@ -62,14 +66,15 @@ serve(async (req) => {
 
     logStep("Request parsed", { bookingId, amount });
 
-    // Verify user owns this booking
+    // Verify user owns this booking (RLS handles authorization)
     const { data: booking, error: bookingError } = await supabase
       .from("bookings")
       .select("id, user_id, payment_status")
       .eq("id", bookingId)
-      .single();
+      .maybeSingle();
 
     if (bookingError || !booking) {
+      logStep("Booking query failed", { error: bookingError?.message });
       throw new Error("Booking not found");
     }
 
