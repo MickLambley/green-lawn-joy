@@ -60,11 +60,16 @@ export const useAddressAutocomplete = () => {
         if (response.ok) {
           const data = await response.json();
           
+          // Extract house number from user's query if present
+          const houseNumberMatch = query.match(/^(\d+[a-zA-Z]?)\s+/);
+          const userHouseNumber = houseNumberMatch ? houseNumberMatch[1] : "";
+
           const formattedSuggestions: AddressSuggestion[] = data
             .filter((item: any) => item.address)
             .map((item: any) => {
               const addr = item.address;
-              const streetNumber = addr.house_number || "";
+              // Use API house number if available, otherwise use the one from user's query
+              const streetNumber = addr.house_number || userHouseNumber;
               const streetName = addr.road || addr.street || "";
               const street = `${streetNumber} ${streetName}`.trim();
               const city = addr.suburb || addr.city || addr.town || addr.municipality || "";
