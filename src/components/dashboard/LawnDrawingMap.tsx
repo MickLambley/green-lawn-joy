@@ -1,8 +1,4 @@
 import { useEffect, useRef, useState, useCallback } from "react";
-import L from "leaflet";
-import "leaflet/dist/leaflet.css";
-import "leaflet-draw";
-import "leaflet-draw/dist/leaflet.draw.css";
 import { Button } from "@/components/ui/button";
 import { Trash2, PenTool, Info } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -12,184 +8,158 @@ interface LawnDrawingMapProps {
   onAreaCalculated: (areaInSqm: number) => void;
 }
 
-// Calculate area of a polygon in square meters using the Shoelace formula
-// with latitude correction for accurate area calculation
-const calculatePolygonArea = (latlngs: L.LatLng[]): number => {
-  if (latlngs.length < 3) return 0;
-
-  const R = 6371000; // Earth's radius in meters
-  let total = 0;
-
-  for (let i = 0; i < latlngs.length; i++) {
-    const j = (i + 1) % latlngs.length;
-    const lat1 = (latlngs[i].lat * Math.PI) / 180;
-    const lat2 = (latlngs[j].lat * Math.PI) / 180;
-    const lng1 = (latlngs[i].lng * Math.PI) / 180;
-    const lng2 = (latlngs[j].lng * Math.PI) / 180;
-
-    total += (lng2 - lng1) * (2 + Math.sin(lat1) + Math.sin(lat2));
+declare global {
+  interface Window {
+    google: typeof google;
+    initMap: () => void;
   }
+}
 
-  return Math.abs((total * R * R) / 2);
-};
+const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "";
 
 const LawnDrawingMap = ({ address, onAreaCalculated }: LawnDrawingMapProps) => {
   const mapRef = useRef<HTMLDivElement>(null);
-  const mapInstanceRef = useRef<L.Map | null>(null);
-  const drawnItemsRef = useRef<L.FeatureGroup | null>(null);
+  const mapInstanceRef = useRef<google.maps.Map | null>(null);
+  const drawingManagerRef = useRef<google.maps.drawing.DrawingManager | null>(null);
+  const polygonsRef = useRef<google.maps.Polygon[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [totalArea, setTotalArea] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [isScriptLoaded, setIsScriptLoaded] = useState(false);
+
+  const calculatePolygonArea = useCallback((polygon: google.maps.Polygon): number => {
+    const path = polygon.getPath();
+    if (path.getLength() < 3) return 0;
+    return google.maps.geometry.sphericalPolygonArea(path);
+  }, []);
 
   const recalculateTotalArea = useCallback(() => {
-    if (!drawnItemsRef.current) return;
-
     let total = 0;
-    drawnItemsRef.current.eachLayer((layer) => {
-      if (layer instanceof L.Polygon) {
-        const latlngs = layer.getLatLngs()[0] as L.LatLng[];
-        total += calculatePolygonArea(latlngs);
-      }
+    polygonsRef.current.forEach((polygon) => {
+      total += calculatePolygonArea(polygon);
     });
-
-    setTotalArea(Math.round(total));
-    onAreaCalculated(Math.round(total));
-  }, [onAreaCalculated]);
+    const roundedTotal = Math.round(total);
+    setTotalArea(roundedTotal);
+    onAreaCalculated(roundedTotal);
+  }, [calculatePolygonArea, onAreaCalculated]);
 
   const clearAllDrawings = useCallback(() => {
-    if (drawnItemsRef.current) {
-      drawnItemsRef.current.clearLayers();
-      setTotalArea(0);
-      onAreaCalculated(0);
-    }
+    polygonsRef.current.forEach((polygon) => {
+      polygon.setMap(null);
+    });
+    polygonsRef.current = [];
+    setTotalArea(0);
+    onAreaCalculated(0);
   }, [onAreaCalculated]);
 
+  // Load Google Maps script
   useEffect(() => {
-    if (!mapRef.current || mapInstanceRef.current) return;
+    if (window.google && window.google.maps) {
+      setIsScriptLoaded(true);
+      return;
+    }
 
-    // Initialize map
-    const map = L.map(mapRef.current, {
-      center: [-33.8688, 151.2093], // Default to Sydney
-      zoom: 18,
+    const existingScript = document.getElementById("google-maps-script");
+    if (existingScript) {
+      existingScript.addEventListener("load", () => setIsScriptLoaded(true));
+      return;
+    }
+
+    const script = document.createElement("script");
+    script.id = "google-maps-script";
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}&libraries=drawing,geometry,places`;
+    script.async = true;
+    script.defer = true;
+    script.onload = () => setIsScriptLoaded(true);
+    script.onerror = () => setError("Failed to load Google Maps. Please check your API key.");
+    document.head.appendChild(script);
+  }, []);
+
+  // Initialize map when script is loaded
+  useEffect(() => {
+    if (!isScriptLoaded || !mapRef.current || mapInstanceRef.current) return;
+
+    const map = new google.maps.Map(mapRef.current, {
+      center: { lat: -33.8688, lng: 151.2093 }, // Default to Sydney
+      zoom: 19,
+      mapTypeId: google.maps.MapTypeId.SATELLITE,
+      tilt: 0,
+      disableDefaultUI: false,
       zoomControl: true,
-    });
-
-    // Add ESRI World Imagery (satellite) tiles
-    L.tileLayer(
-      "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-      {
-        attribution: "Tiles &copy; Esri",
-        maxZoom: 20,
-      }
-    ).addTo(map);
-
-    // Create feature group for drawn items
-    const drawnItems = new L.FeatureGroup();
-    map.addLayer(drawnItems);
-    drawnItemsRef.current = drawnItems;
-
-    // Initialize draw control
-    const drawControl = new L.Control.Draw({
-      position: "topright",
-      draw: {
-        polygon: {
-          allowIntersection: false,
-          showArea: true,
-          shapeOptions: {
-            color: "#22c55e",
-            fillColor: "#22c55e",
-            fillOpacity: 0.3,
-            weight: 3,
-          },
-        },
-        polyline: false,
-        circle: false,
-        circlemarker: false,
-        marker: false,
-        rectangle: {
-          shapeOptions: {
-            color: "#22c55e",
-            fillColor: "#22c55e",
-            fillOpacity: 0.3,
-            weight: 3,
-          },
-        },
-      },
-      edit: {
-        featureGroup: drawnItems,
-        remove: true,
-      },
-    });
-    map.addControl(drawControl);
-
-    // Handle draw events
-    map.on(L.Draw.Event.CREATED, (e: any) => {
-      drawnItems.addLayer(e.layer);
-      recalculateTotalArea();
-    });
-
-    map.on(L.Draw.Event.EDITED, () => {
-      recalculateTotalArea();
-    });
-
-    map.on(L.Draw.Event.DELETED, () => {
-      recalculateTotalArea();
+      mapTypeControl: true,
+      streetViewControl: false,
+      fullscreenControl: true,
     });
 
     mapInstanceRef.current = map;
 
-    // Geocode the address and center the map
-    const geocodeAddress = async () => {
-      setIsLoading(true);
-      setError(null);
+    // Initialize drawing manager
+    const drawingManager = new google.maps.drawing.DrawingManager({
+      drawingMode: google.maps.drawing.OverlayType.POLYGON,
+      drawingControl: true,
+      drawingControlOptions: {
+        position: google.maps.ControlPosition.TOP_CENTER,
+        drawingModes: [
+          google.maps.drawing.OverlayType.POLYGON,
+        ],
+      },
+      polygonOptions: {
+        fillColor: "#22c55e",
+        fillOpacity: 0.3,
+        strokeColor: "#22c55e",
+        strokeWeight: 3,
+        editable: true,
+        draggable: true,
+      },
+    });
 
-      try {
-        const response = await fetch(
-          `https://nominatim.openstreetmap.org/search?` +
-            `q=${encodeURIComponent(address + ", Australia")}&` +
-            `format=json&` +
-            `limit=1`,
-          {
-            headers: {
-              "User-Agent": "Lawnly App (contact@lawnly.com.au)",
-            },
-          }
-        );
+    drawingManager.setMap(map);
+    drawingManagerRef.current = drawingManager;
 
-        if (response.ok) {
-          const data = await response.json();
-          if (data.length > 0) {
-            const { lat, lon } = data[0];
-            map.setView([parseFloat(lat), parseFloat(lon)], 19);
-          } else {
-            setError("Could not find address location. Please adjust the map manually.");
-          }
-        }
-      } catch (err) {
-        console.error("Geocoding error:", err);
-        setError("Could not load address location. Please adjust the map manually.");
-      } finally {
-        setIsLoading(false);
+    // Handle polygon completion
+    google.maps.event.addListener(drawingManager, "polygoncomplete", (polygon: google.maps.Polygon) => {
+      polygonsRef.current.push(polygon);
+      recalculateTotalArea();
+
+      // Add listeners for polygon edits
+      google.maps.event.addListener(polygon.getPath(), "set_at", recalculateTotalArea);
+      google.maps.event.addListener(polygon.getPath(), "insert_at", recalculateTotalArea);
+      google.maps.event.addListener(polygon.getPath(), "remove_at", recalculateTotalArea);
+      google.maps.event.addListener(polygon, "dragend", recalculateTotalArea);
+
+      // Switch back to hand mode after drawing
+      drawingManager.setDrawingMode(null);
+    });
+
+    // Geocode the address
+    const geocoder = new google.maps.Geocoder();
+    geocoder.geocode({ address: address + ", Australia" }, (results, status) => {
+      setIsLoading(false);
+      if (status === google.maps.GeocoderStatus.OK && results && results[0]) {
+        map.setCenter(results[0].geometry.location);
+        map.setZoom(20);
+      } else {
+        setError("Could not find address location. Please adjust the map manually.");
       }
-    };
-
-    geocodeAddress();
+    });
 
     return () => {
-      if (mapInstanceRef.current) {
-        mapInstanceRef.current.remove();
-        mapInstanceRef.current = null;
+      if (drawingManagerRef.current) {
+        drawingManagerRef.current.setMap(null);
       }
+      polygonsRef.current.forEach((polygon) => polygon.setMap(null));
+      polygonsRef.current = [];
     };
-  }, [address, recalculateTotalArea]);
+  }, [isScriptLoaded, address, recalculateTotalArea]);
 
   return (
     <div className="space-y-4">
       <Alert>
         <Info className="h-4 w-4" />
         <AlertDescription>
-          Use the drawing tools on the right side of the map to outline your lawn areas. 
-          Click to add points, double-click to finish a shape. You can draw multiple areas.
+          Use the polygon tool to draw the outline of your lawn areas. 
+          Click to add points, and close the shape by clicking the first point. 
+          You can drag to edit after drawing.
         </AlertDescription>
       </Alert>
 
