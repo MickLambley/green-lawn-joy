@@ -28,8 +28,9 @@ import {
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { MapPin, Loader2 } from "lucide-react";
+import { MapPin, Loader2, ArrowLeft, ArrowRight } from "lucide-react";
 import AddressAutocompleteInput from "./AddressAutocompleteInput";
+import LawnDrawingMap from "./LawnDrawingMap";
 
 const addressSchema = z.object({
   street_address: z
@@ -59,6 +60,7 @@ const addressSchema = z.object({
     .max(100, "Country must be less than 100 characters"),
   slope: z.enum(["flat", "mild", "steep"]),
   tier_count: z.number().min(1).max(10),
+  square_meters: z.number().min(0).optional(),
 });
 
 type AddressFormData = z.infer<typeof addressSchema>;
@@ -69,8 +71,12 @@ interface AddAddressDialogProps {
   onSuccess?: () => void;
 }
 
+type Step = "address" | "map" | "details";
+
 const AddAddressDialog = ({ open, onOpenChange, onSuccess }: AddAddressDialogProps) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [currentStep, setCurrentStep] = useState<Step>("address");
+  const [calculatedArea, setCalculatedArea] = useState(0);
 
   const form = useForm<AddressFormData>({
     resolver: zodResolver(addressSchema),
@@ -82,6 +88,7 @@ const AddAddressDialog = ({ open, onOpenChange, onSuccess }: AddAddressDialogPro
       country: "Australia",
       slope: "flat",
       tier_count: 1,
+      square_meters: 0,
     },
   });
 
@@ -95,6 +102,24 @@ const AddAddressDialog = ({ open, onOpenChange, onSuccess }: AddAddressDialogPro
     form.setValue("city", address.city);
     form.setValue("state", address.state);
     form.setValue("postal_code", address.postal_code);
+  };
+
+  const handleAreaCalculated = (areaInSqm: number) => {
+    setCalculatedArea(areaInSqm);
+    form.setValue("square_meters", areaInSqm);
+  };
+
+  const canProceedToMap = () => {
+    const values = form.getValues();
+    return values.street_address.length >= 5 && 
+           values.city.length >= 2 && 
+           values.state.length >= 2 && 
+           values.postal_code.length >= 3;
+  };
+
+  const getFullAddress = () => {
+    const values = form.getValues();
+    return `${values.street_address}, ${values.city}, ${values.state} ${values.postal_code}`;
   };
 
   const onSubmit = async (data: AddressFormData) => {
@@ -116,6 +141,7 @@ const AddAddressDialog = ({ open, onOpenChange, onSuccess }: AddAddressDialogPro
         country: data.country,
         slope: data.slope,
         tier_count: data.tier_count,
+        square_meters: calculatedArea > 0 ? calculatedArea : null,
       });
 
       if (error) {
@@ -128,6 +154,8 @@ const AddAddressDialog = ({ open, onOpenChange, onSuccess }: AddAddressDialogPro
         description: "We'll verify your property and notify you once it's approved.",
       });
       form.reset();
+      setCurrentStep("address");
+      setCalculatedArea(0);
       onOpenChange(false);
       onSuccess?.();
     } catch (error) {
@@ -137,180 +165,310 @@ const AddAddressDialog = ({ open, onOpenChange, onSuccess }: AddAddressDialogPro
     }
   };
 
+  const handleOpenChange = (open: boolean) => {
+    if (!open) {
+      setCurrentStep("address");
+      setCalculatedArea(0);
+      form.reset();
+    }
+    onOpenChange(open);
+  };
+
+  const renderAddressStep = () => (
+    <>
+      <FormField
+        control={form.control}
+        name="street_address"
+        render={({ field }) => (
+          <FormItem>
+            <FormLabel>Street Address</FormLabel>
+            <FormControl>
+              <AddressAutocompleteInput
+                value={field.value}
+                onChange={field.onChange}
+                onSelectAddress={handleAddressSelect}
+                placeholder="Start typing your address..."
+              />
+            </FormControl>
+            <FormMessage />
+          </FormItem>
+        )}
+      />
+
+      <div className="grid grid-cols-2 gap-4">
+        <FormField
+          control={form.control}
+          name="city"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Suburb</FormLabel>
+              <FormControl>
+                <Input placeholder="Sydney" {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={form.control}
+          name="state"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>State</FormLabel>
+              <FormControl>
+                <Input placeholder="NSW" {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <FormField
+          control={form.control}
+          name="postal_code"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Postal Code</FormLabel>
+              <FormControl>
+                <Input placeholder="2000" {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={form.control}
+          name="country"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Country</FormLabel>
+              <FormControl>
+                <Input {...field} disabled />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+      </div>
+
+      <div className="flex gap-3 pt-4">
+        <Button
+          type="button"
+          variant="outline"
+          className="flex-1"
+          onClick={() => handleOpenChange(false)}
+        >
+          Cancel
+        </Button>
+        <Button
+          type="button"
+          className="flex-1"
+          onClick={() => setCurrentStep("map")}
+          disabled={!canProceedToMap()}
+        >
+          Next: Mark Lawn Areas
+          <ArrowRight className="w-4 h-4 ml-1" />
+        </Button>
+      </div>
+    </>
+  );
+
+  const renderMapStep = () => (
+    <>
+      <div className="mb-4 p-3 bg-muted rounded-lg">
+        <p className="text-sm font-medium">{getFullAddress()}</p>
+      </div>
+
+      <LawnDrawingMap
+        address={getFullAddress()}
+        onAreaCalculated={handleAreaCalculated}
+      />
+
+      <div className="flex gap-3 pt-4">
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => setCurrentStep("address")}
+        >
+          <ArrowLeft className="w-4 h-4 mr-1" />
+          Back
+        </Button>
+        <Button
+          type="button"
+          className="flex-1"
+          onClick={() => setCurrentStep("details")}
+        >
+          Next: Property Details
+          <ArrowRight className="w-4 h-4 ml-1" />
+        </Button>
+      </div>
+    </>
+  );
+
+  const renderDetailsStep = () => (
+    <>
+      <div className="mb-4 p-3 bg-muted rounded-lg space-y-1">
+        <p className="text-sm font-medium">{getFullAddress()}</p>
+        <p className="text-sm text-primary">
+          Lawn area: {calculatedArea > 0 ? `${calculatedArea} m²` : "Not specified"}
+        </p>
+      </div>
+
+      <div className="border-t pt-4">
+        <h4 className="text-sm font-medium mb-3">Additional Property Details</h4>
+        <p className="text-xs text-muted-foreground mb-4">
+          This helps us calculate accurate pricing for your property.
+        </p>
+        <div className="grid grid-cols-2 gap-4">
+          <FormField
+            control={form.control}
+            name="slope"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Land Slope</FormLabel>
+                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select slope" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    <SelectItem value="flat">Flat</SelectItem>
+                    <SelectItem value="mild">Mild slope</SelectItem>
+                    <SelectItem value="steep">Steep slope</SelectItem>
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="tier_count"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Number of Tiers</FormLabel>
+                <Select 
+                  onValueChange={(val) => field.onChange(parseInt(val))} 
+                  defaultValue={field.value.toString()}
+                >
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select tiers" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((num) => (
+                      <SelectItem key={num} value={num.toString()}>
+                        {num} {num === 1 ? "tier" : "tiers"}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
+      </div>
+
+      <div className="flex gap-3 pt-4">
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => setCurrentStep("map")}
+        >
+          <ArrowLeft className="w-4 h-4 mr-1" />
+          Back
+        </Button>
+        <Button type="submit" className="flex-1" disabled={isSubmitting}>
+          {isSubmitting ? (
+            <>
+              <Loader2 className="w-4 h-4 animate-spin" />
+              Submitting...
+            </>
+          ) : (
+            "Submit for Verification"
+          )}
+        </Button>
+      </div>
+    </>
+  );
+
+  const getStepTitle = () => {
+    switch (currentStep) {
+      case "address":
+        return "Add New Address";
+      case "map":
+        return "Mark Your Lawn Areas";
+      case "details":
+        return "Property Details";
+    }
+  };
+
+  const getStepDescription = () => {
+    switch (currentStep) {
+      case "address":
+        return "Enter your property address.";
+      case "map":
+        return "Draw the outline of your lawn areas on the satellite map.";
+      case "details":
+        return "Add additional details about your property.";
+    }
+  };
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px]">
+    <Dialog open={open} onOpenChange={handleOpenChange}>
+      <DialogContent className={currentStep === "map" ? "sm:max-w-[700px]" : "sm:max-w-[500px]"}>
         <DialogHeader>
           <div className="flex items-center gap-3 mb-2">
             <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
               <MapPin className="w-5 h-5 text-primary" />
             </div>
             <div>
-              <DialogTitle className="font-display">Add New Address</DialogTitle>
+              <DialogTitle className="font-display">{getStepTitle()}</DialogTitle>
               <DialogDescription>
-                Enter your property address for verification.
+                {getStepDescription()}
               </DialogDescription>
             </div>
+          </div>
+          
+          {/* Step indicator */}
+          <div className="flex items-center gap-2 pt-2">
+            {["address", "map", "details"].map((step, index) => (
+              <div key={step} className="flex items-center">
+                <div
+                  className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-colors ${
+                    currentStep === step
+                      ? "bg-primary text-primary-foreground"
+                      : index < ["address", "map", "details"].indexOf(currentStep)
+                      ? "bg-primary/20 text-primary"
+                      : "bg-muted text-muted-foreground"
+                  }`}
+                >
+                  {index + 1}
+                </div>
+                {index < 2 && (
+                  <div
+                    className={`w-8 h-0.5 mx-1 ${
+                      index < ["address", "map", "details"].indexOf(currentStep)
+                        ? "bg-primary"
+                        : "bg-muted"
+                    }`}
+                  />
+                )}
+              </div>
+            ))}
           </div>
         </DialogHeader>
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <FormField
-              control={form.control}
-              name="street_address"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Street Address</FormLabel>
-                  <FormControl>
-                    <AddressAutocompleteInput
-                      value={field.value}
-                      onChange={field.onChange}
-                      onSelectAddress={handleAddressSelect}
-                      placeholder="Start typing your address..."
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <div className="grid grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="city"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>City</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Sydney" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="state"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>State</FormLabel>
-                    <FormControl>
-                      <Input placeholder="NSW" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="postal_code"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Postal Code</FormLabel>
-                    <FormControl>
-                      <Input placeholder="2000" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="country"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Country</FormLabel>
-                    <FormControl>
-                      <Input {...field} disabled />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-
-            <div className="border-t pt-4 mt-4">
-              <h4 className="text-sm font-medium mb-3">Property Details</h4>
-              <p className="text-xs text-muted-foreground mb-4">
-                This helps us calculate accurate pricing for your property.
-              </p>
-              <div className="grid grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="slope"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Land Slope</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select slope" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="flat">Flat</SelectItem>
-                          <SelectItem value="mild">Mild slope</SelectItem>
-                          <SelectItem value="steep">Steep slope</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="tier_count"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Number of Tiers</FormLabel>
-                      <Select 
-                        onValueChange={(val) => field.onChange(parseInt(val))} 
-                        defaultValue={field.value.toString()}
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select tiers" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((num) => (
-                            <SelectItem key={num} value={num.toString()}>
-                              {num} {num === 1 ? "tier" : "tiers"}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-            </div>
-
-            <div className="flex gap-3 pt-4">
-              <Button
-                type="button"
-                variant="outline"
-                className="flex-1"
-                onClick={() => onOpenChange(false)}
-              >
-                Cancel
-              </Button>
-              <Button type="submit" className="flex-1" disabled={isSubmitting}>
-                {isSubmitting ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    Submitting...
-                  </>
-                ) : (
-                  "Submit for Verification"
-                )}
-              </Button>
-            </div>
+            {currentStep === "address" && renderAddressStep()}
+            {currentStep === "map" && renderMapStep()}
+            {currentStep === "details" && renderDetailsStep()}
           </form>
         </Form>
       </DialogContent>
