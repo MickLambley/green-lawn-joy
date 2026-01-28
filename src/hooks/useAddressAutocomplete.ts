@@ -67,7 +67,7 @@ export const useAddressAutocomplete = () => {
               const streetNumber = addr.house_number || "";
               const streetName = addr.road || addr.street || "";
               const street = `${streetNumber} ${streetName}`.trim();
-              const city = addr.city || addr.town || addr.suburb || addr.municipality || "";
+              const city = addr.suburb || addr.city || addr.town || addr.municipality || "";
               const state = stateAbbreviations[addr.state] || addr.state || "";
               const postcode = addr.postcode || "";
 
