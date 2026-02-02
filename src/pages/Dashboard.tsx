@@ -50,7 +50,7 @@ const Dashboard = () => {
   const navigate = useNavigate();
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<"overview" | "addresses" | "bookings">("overview");
+  const [activeTab, setActiveTab] = useState<"overview" | "bookings">("overview");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [addressDialogOpen, setAddressDialogOpen] = useState(false);
   const [bookingDialogOpen, setBookingDialogOpen] = useState(false);
@@ -160,7 +160,7 @@ const Dashboard = () => {
     navigate("/");
   };
 
-  const handleTabChange = (tab: "overview" | "addresses" | "bookings") => {
+  const handleTabChange = (tab: "overview" | "bookings") => {
     setActiveTab(tab);
     setSidebarOpen(false);
   };
@@ -350,17 +350,6 @@ const Dashboard = () => {
             <span className="font-medium">Overview</span>
           </button>
           <button
-            onClick={() => handleTabChange("addresses")}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-colors ${
-              activeTab === "addresses"
-                ? "bg-primary text-primary-foreground"
-                : "text-muted-foreground hover:bg-muted hover:text-foreground"
-            }`}
-          >
-            <MapPin className="w-5 h-5" />
-            <span className="font-medium">My Addresses</span>
-          </button>
-          <button
             onClick={() => handleTabChange("bookings")}
             className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-colors ${
               activeTab === "bookings"
@@ -466,8 +455,8 @@ const Dashboard = () => {
               </button>
             </div>
 
-            {/* Getting Started or Pending Status */}
-            {addresses.length === 0 ? (
+            {/* Getting Started (only if no addresses) */}
+            {addresses.length === 0 && (
               <div className="bg-card rounded-2xl p-6 md:p-8 shadow-soft">
                 <h2 className="font-display text-lg md:text-xl font-bold text-foreground mb-6">
                   Getting Started
@@ -522,117 +511,142 @@ const Dashboard = () => {
                   </div>
                 </div>
               </div>
-            ) : (
-              <div className="bg-card rounded-2xl p-6 md:p-8 shadow-soft">
-                <h2 className="font-display text-lg md:text-xl font-bold text-foreground mb-4">
-                  Your Addresses
-                </h2>
-                <div className="space-y-3">
-                  {addresses.slice(0, 3).map((address) => (
-                    <div key={address.id} className="flex items-center justify-between p-4 rounded-xl border border-border">
-                      <div className="flex items-center gap-3">
-                        <MapPin className="w-5 h-5 text-muted-foreground" />
-                        <div>
-                          <p className="font-medium">{address.street_address}</p>
-                          <p className="text-sm text-muted-foreground">{address.city}, {address.state}</p>
-                        </div>
-                      </div>
-                      {getStatusBadge(address.status)}
-                    </div>
-                  ))}
-                  {addresses.length > 3 && (
-                    <Button variant="ghost" className="w-full" onClick={() => handleTabChange("addresses")}>
-                      View all addresses
-                    </Button>
-                  )}
-                </div>
-              </div>
             )}
-          </div>
-        )}
 
-        {activeTab === "addresses" && (
-          <div className="space-y-6">
-            <div className="flex items-center justify-between">
-              <h2 className="font-display text-lg md:text-xl font-bold text-foreground">
-                My Addresses
-              </h2>
-              <Button size="sm" onClick={openAddressDialog}>
-                <Plus className="w-4 h-4" />
-                <span className="hidden sm:inline">Add Address</span>
-              </Button>
-            </div>
-
-            {addresses.length === 0 ? (
-              <div className="bg-card rounded-2xl p-8 md:p-12 shadow-soft text-center">
-                <div className="w-16 h-16 mx-auto mb-6 rounded-full bg-muted flex items-center justify-center">
-                  <MapPin className="w-8 h-8 text-muted-foreground" />
+            {/* Upcoming Mows Section */}
+            {upcomingBookings.length > 0 && (
+              <div className="bg-card rounded-2xl p-6 md:p-8 shadow-soft">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="font-display text-lg md:text-xl font-bold text-foreground">
+                    Upcoming Mows
+                  </h2>
+                  <Button variant="ghost" size="sm" onClick={() => handleTabChange("bookings")}>
+                    View all
+                    <ChevronRight className="w-4 h-4 ml-1" />
+                  </Button>
                 </div>
-                <h3 className="font-display text-lg md:text-xl font-semibold text-foreground mb-2">
-                  No addresses yet
-                </h3>
-                <p className="text-muted-foreground mb-6 max-w-md mx-auto text-sm md:text-base">
-                  Add your property address to get started. We'll verify the
-                  location and lawn size to provide accurate pricing.
-                </p>
-                <Button onClick={openAddressDialog}>
-                  <Plus className="w-4 h-4" />
-                  Add Your First Address
-                </Button>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {addresses.map((address) => (
-                  <div key={address.id} className="bg-card rounded-2xl p-6 shadow-soft">
-                    <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
-                      <div className="flex items-start gap-4">
-                        <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
-                          <MapPin className="w-6 h-6 text-primary" />
-                        </div>
-                        <div>
-                          <div className="flex items-center gap-2 mb-1">
-                            <h3 className="font-semibold text-foreground">{address.street_address}</h3>
-                            {getStatusBadge(address.status)}
+                <div className="space-y-3">
+                  {upcomingBookings.slice(0, 3).map((booking) => {
+                    const address = addresses.find(a => a.id === booking.address_id);
+                    return (
+                      <div key={booking.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-xl border border-border gap-3">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-lg bg-accent/20 flex items-center justify-center flex-shrink-0">
+                            <Calendar className="w-5 h-5 text-accent-foreground" />
                           </div>
-                          <p className="text-sm text-muted-foreground">
-                            {address.city}, {address.state} {address.postal_code}
-                          </p>
-                        <div className="flex flex-wrap gap-3 mt-3 text-sm text-muted-foreground">
-                            <span>Slope: {getSlopeLabel(address.slope)}</span>
-                            <span>•</span>
-                            <span>Tiers: {address.tier_count}</span>
-                            {address.square_meters && (
-                              <>
-                                <span>•</span>
-                                <span>{address.square_meters} m²</span>
-                              </>
+                          <div>
+                            <p className="font-medium">
+                              {new Date(booking.scheduled_date).toLocaleDateString("en-AU", {
+                                weekday: "short",
+                                day: "numeric",
+                                month: "short",
+                              })}
+                              {booking.time_slot && ` • ${booking.time_slot}`}
+                            </p>
+                            {address && (
+                              <p className="text-sm text-muted-foreground">
+                                {address.street_address}, {address.city}
+                              </p>
                             )}
                           </div>
                         </div>
+                        <div className="flex items-center gap-2">
+                          {getStatusBadge(booking.status)}
+                          {canModifyBooking(booking) && (
+                            <>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => handleEditBooking(booking)}
+                              >
+                                <Pencil className="w-4 h-4" />
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                                onClick={() => setDeleteBookingId(booking.id)}
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            </>
+                          )}
+                        </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        {address.status === "verified" && (
-                          <Button size="sm" onClick={() => openBookingDialog(address.id)}>
-                            <Calendar className="w-4 h-4" />
-                            Book Now
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Addresses Section */}
+            {addresses.length > 0 && (
+              <div className="bg-card rounded-2xl p-6 md:p-8 shadow-soft">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="font-display text-lg md:text-xl font-bold text-foreground">
+                    My Addresses
+                  </h2>
+                  <Button size="sm" onClick={openAddressDialog}>
+                    <Plus className="w-4 h-4" />
+                    <span className="hidden sm:inline ml-1">Add Address</span>
+                  </Button>
+                </div>
+                <div className="space-y-4">
+                  {addresses.map((address) => (
+                    <div key={address.id} className="p-4 rounded-xl border border-border">
+                      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+                        <div className="flex items-start gap-4">
+                          <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
+                            <MapPin className="w-6 h-6 text-primary" />
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2 mb-1">
+                              <h3 className="font-semibold text-foreground">{address.street_address}</h3>
+                              {getStatusBadge(address.status)}
+                            </div>
+                            <p className="text-sm text-muted-foreground">
+                              {address.city}, {address.state} {address.postal_code}
+                            </p>
+                            <div className="flex flex-wrap gap-3 mt-2 text-sm text-muted-foreground">
+                              <span>Slope: {getSlopeLabel(address.slope)}</span>
+                              <span>•</span>
+                              <span>Tiers: {address.tier_count}</span>
+                              {address.square_meters && (
+                                <>
+                                  <span>•</span>
+                                  <span>{address.square_meters} m²</span>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {address.status === "verified" && (
+                            <Button size="sm" onClick={() => openBookingDialog(address.id)}>
+                              <Calendar className="w-4 h-4" />
+                              <span className="hidden sm:inline ml-1">Book Now</span>
+                            </Button>
+                          )}
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                            onClick={() => setDeleteAddressId(address.id)}
+                          >
+                            <Trash2 className="w-4 h-4" />
                           </Button>
-                        )}
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                          onClick={() => setDeleteAddressId(address.id)}
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
             )}
           </div>
         )}
+
+
+
 
         {activeTab === "bookings" && (
           <div className="space-y-6">
@@ -665,7 +679,7 @@ const Dashboard = () => {
                     Book Your First Service
                   </Button>
                 ) : (
-                  <Button variant="outline" onClick={() => handleTabChange("addresses")}>
+                  <Button variant="outline" onClick={openAddressDialog}>
                     <MapPin className="w-4 h-4" />
                     Add an Address First
                   </Button>
