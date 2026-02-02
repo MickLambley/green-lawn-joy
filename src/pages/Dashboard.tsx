@@ -18,7 +18,18 @@ import {
   X,
   Shield,
   Bell,
+  Trash2,
 } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 import AddAddressDialog from "@/components/dashboard/AddAddressDialog";
 import BookingDialog from "@/components/dashboard/BookingDialog";
@@ -42,6 +53,8 @@ const Dashboard = () => {
   const [addresses, setAddresses] = useState<Address[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [deleteAddressId, setDeleteAddressId] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
@@ -135,6 +148,43 @@ const Dashboard = () => {
   const handleBookingSuccess = () => {
     if (user) {
       fetchUserData(user.id);
+    }
+  };
+
+  const handleDeleteAddress = async () => {
+    if (!deleteAddressId) return;
+    
+    setIsDeleting(true);
+    try {
+      // Check if there are any bookings for this address
+      const { data: addressBookings } = await supabase
+        .from("bookings")
+        .select("id")
+        .eq("address_id", deleteAddressId)
+        .limit(1);
+      
+      if (addressBookings && addressBookings.length > 0) {
+        toast.error("Cannot delete address with existing bookings");
+        setDeleteAddressId(null);
+        setIsDeleting(false);
+        return;
+      }
+
+      const { error } = await supabase
+        .from("addresses")
+        .delete()
+        .eq("id", deleteAddressId);
+
+      if (error) throw error;
+
+      toast.success("Address deleted successfully");
+      setAddresses(addresses.filter(a => a.id !== deleteAddressId));
+    } catch (error) {
+      console.error("Error deleting address:", error);
+      toast.error("Failed to delete address");
+    } finally {
+      setDeleteAddressId(null);
+      setIsDeleting(false);
     }
   };
 
@@ -491,12 +541,22 @@ const Dashboard = () => {
                           </div>
                         </div>
                       </div>
-                      {address.status === "verified" && (
-                        <Button size="sm" onClick={() => openBookingDialog(address.id)}>
-                          <Calendar className="w-4 h-4" />
-                          Book Now
+                      <div className="flex items-center gap-2">
+                        {address.status === "verified" && (
+                          <Button size="sm" onClick={() => openBookingDialog(address.id)}>
+                            <Calendar className="w-4 h-4" />
+                            Book Now
+                          </Button>
+                        )}
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                          onClick={() => setDeleteAddressId(address.id)}
+                        >
+                          <Trash2 className="w-4 h-4" />
                         </Button>
-                      )}
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -612,6 +672,28 @@ const Dashboard = () => {
           userId={user.id}
         />
       )}
+
+      {/* Delete Address Confirmation Dialog */}
+      <AlertDialog open={!!deleteAddressId} onOpenChange={(open) => !open && setDeleteAddressId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Address</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this address? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteAddress}
+              disabled={isDeleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isDeleting ? "Deleting..." : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
