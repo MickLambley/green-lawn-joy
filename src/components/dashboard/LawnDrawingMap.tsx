@@ -30,7 +30,7 @@ const LawnDrawingMap = ({ address, onAreaCalculated }: LawnDrawingMapProps) => {
   const calculatePolygonArea = useCallback((polygon: google.maps.Polygon): number => {
     const path = polygon.getPath();
     if (path.getLength() < 3) return 0;
-    return google.maps.geometry.sphericalPolygonArea(path);
+    return google.maps.geometry.spherical.computeArea(path);
   }, []);
 
   const recalculateTotalArea = useCallback(() => {
