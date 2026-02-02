@@ -10,8 +10,7 @@ const Navbar = () => {
   const navLinks = [
     { name: "Home", href: "/" },
     { name: "About", href: "/about" },
-    { name: "Services", href: "/#services" },
-    { name: "Pricing", href: "/#pricing" },
+    { name: "Contractors", href: "/contractors" },
   ];
 
   const isActive = (href: string) => location.pathname === href;
