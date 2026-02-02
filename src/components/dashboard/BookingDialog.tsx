@@ -36,6 +36,8 @@ interface Contractor {
   };
 }
 
+type Booking = Database["public"]["Tables"]["bookings"]["Row"];
+
 interface BookingDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -43,6 +45,7 @@ interface BookingDialogProps {
   defaultAddressId?: string;
   onSuccess: () => void;
   onAddressAdded?: () => void;
+  editingBooking?: Booking | null;
 }
 
 interface PricingSettings {
@@ -88,7 +91,7 @@ const timeSlots = [
   { value: "2pm-5pm", label: "2:00 PM - 5:00 PM", description: "Afternoon" },
 ];
 
-const BookingDialog = ({ open, onOpenChange, addresses, defaultAddressId, onSuccess, onAddressAdded }: BookingDialogProps) => {
+const BookingDialog = ({ open, onOpenChange, addresses, defaultAddressId, onSuccess, onAddressAdded, editingBooking }: BookingDialogProps) => {
   const [step, setStep] = useState<"form" | "quote">("form");
   const [loading, setLoading] = useState(false);
   const [pricingSettings, setPricingSettings] = useState<PricingSettings | null>(null);
@@ -113,28 +116,43 @@ const BookingDialog = ({ open, onOpenChange, addresses, defaultAddressId, onSucc
   const verifiedAddresses = addresses.filter(a => a.status === "verified");
   const selectedAddress = verifiedAddresses.find(a => a.id === selectedAddressId);
 
+  const isEditMode = !!editingBooking;
+
   useEffect(() => {
     if (open) {
       fetchPricingSettings();
       setStep("form");
-      setSelectedDate(undefined);
-      setGrassLength("medium");
-      setClippingsRemoval(false);
-      setTimeSlot("10am-2pm");
       setQuote(null);
-      setSelectSpecificContractor(false);
-      setSelectedContractorId("");
       
-      // Set default address
-      if (defaultAddressId && verifiedAddresses.some(a => a.id === defaultAddressId)) {
-        setSelectedAddressId(defaultAddressId);
-      } else if (verifiedAddresses.length === 1) {
-        setSelectedAddressId(verifiedAddresses[0].id);
+      if (editingBooking) {
+        // Populate form with existing booking data
+        setSelectedAddressId(editingBooking.address_id);
+        setSelectedDate(new Date(editingBooking.scheduled_date));
+        setGrassLength(editingBooking.grass_length || "medium");
+        setClippingsRemoval(editingBooking.clippings_removal || false);
+        setTimeSlot(editingBooking.time_slot || "10am-2pm");
+        setSelectSpecificContractor(!!editingBooking.preferred_contractor_id);
+        setSelectedContractorId(editingBooking.preferred_contractor_id || "");
       } else {
-        setSelectedAddressId("");
+        // Reset form for new booking
+        setSelectedDate(undefined);
+        setGrassLength("medium");
+        setClippingsRemoval(false);
+        setTimeSlot("10am-2pm");
+        setSelectSpecificContractor(false);
+        setSelectedContractorId("");
+        
+        // Set default address
+        if (defaultAddressId && verifiedAddresses.some(a => a.id === defaultAddressId)) {
+          setSelectedAddressId(defaultAddressId);
+        } else if (verifiedAddresses.length === 1) {
+          setSelectedAddressId(verifiedAddresses[0].id);
+        } else {
+          setSelectedAddressId("");
+        }
       }
     }
-  }, [open, defaultAddressId, addresses]);
+  }, [open, defaultAddressId, addresses, editingBooking]);
 
   useEffect(() => {
     if (selectedAddress && selectSpecificContractor) {
@@ -278,47 +296,76 @@ const BookingDialog = ({ open, onOpenChange, addresses, defaultAddressId, onSucc
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
 
-      const { data, error } = await supabase.from("bookings").insert([{
-        user_id: user.id,
-        address_id: selectedAddress.id,
-        scheduled_date: selectedDate.toISOString().split("T")[0],
-        scheduled_time: timeSlot,
-        grass_length: grassLength,
-        clippings_removal: clippingsRemoval,
-        time_slot: timeSlot,
-        is_weekend: isWeekend(selectedDate),
-        is_public_holiday: false,
-        total_price: totalWithGst,
-        quote_breakdown: JSON.parse(JSON.stringify(quote)),
-        status: "pending" as const,
-        payment_status: "unpaid",
-        preferred_contractor_id: selectSpecificContractor && selectedContractorId ? selectedContractorId : null,
-      }]).select().single();
+      if (isEditMode && editingBooking) {
+        // Update existing booking
+        const { error } = await supabase
+          .from("bookings")
+          .update({
+            address_id: selectedAddress.id,
+            scheduled_date: selectedDate.toISOString().split("T")[0],
+            scheduled_time: timeSlot,
+            grass_length: grassLength,
+            clippings_removal: clippingsRemoval,
+            time_slot: timeSlot,
+            is_weekend: isWeekend(selectedDate),
+            total_price: totalWithGst,
+            quote_breakdown: JSON.parse(JSON.stringify(quote)),
+            preferred_contractor_id: selectSpecificContractor && selectedContractorId ? selectedContractorId : null,
+          })
+          .eq("id", editingBooking.id);
 
-      if (error) throw error;
+        if (error) throw error;
 
-      setCreatedBookingId(data.id);
-      
-      // Send booking created email (non-blocking)
-      sendBookingEmail(data.id, "created");
-      
-      // Create PaymentIntent via edge function
-      const { data: paymentData, error: paymentError } = await supabase.functions.invoke(
-        "create-payment-intent",
-        {
-          body: { bookingId: data.id, amount: totalWithGst },
+        // Send booking updated email (non-blocking)
+        sendBookingEmail(editingBooking.id, "updated");
+
+        toast.success("Booking updated successfully!");
+        onSuccess();
+        onOpenChange(false);
+      } else {
+        // Create new booking
+        const { data, error } = await supabase.from("bookings").insert([{
+          user_id: user.id,
+          address_id: selectedAddress.id,
+          scheduled_date: selectedDate.toISOString().split("T")[0],
+          scheduled_time: timeSlot,
+          grass_length: grassLength,
+          clippings_removal: clippingsRemoval,
+          time_slot: timeSlot,
+          is_weekend: isWeekend(selectedDate),
+          is_public_holiday: false,
+          total_price: totalWithGst,
+          quote_breakdown: JSON.parse(JSON.stringify(quote)),
+          status: "pending" as const,
+          payment_status: "unpaid",
+          preferred_contractor_id: selectSpecificContractor && selectedContractorId ? selectedContractorId : null,
+        }]).select().single();
+
+        if (error) throw error;
+
+        setCreatedBookingId(data.id);
+        
+        // Send booking created email (non-blocking)
+        sendBookingEmail(data.id, "created");
+        
+        // Create PaymentIntent via edge function
+        const { data: paymentData, error: paymentError } = await supabase.functions.invoke(
+          "create-payment-intent",
+          {
+            body: { bookingId: data.id, amount: totalWithGst },
+          }
+        );
+
+        if (paymentError || !paymentData?.clientSecret) {
+          throw new Error(paymentError?.message || "Failed to create payment intent");
         }
-      );
 
-      if (paymentError || !paymentData?.clientSecret) {
-        throw new Error(paymentError?.message || "Failed to create payment intent");
+        setClientSecret(paymentData.clientSecret);
+        setPaymentDialogOpen(true);
       }
-
-      setClientSecret(paymentData.clientSecret);
-      setPaymentDialogOpen(true);
     } catch (error) {
       console.error("Booking error:", error);
-      toast.error("Failed to create booking");
+      toast.error(isEditMode ? "Failed to update booking" : "Failed to create booking");
     } finally {
       setLoading(false);
     }
@@ -364,8 +411,8 @@ const BookingDialog = ({ open, onOpenChange, addresses, defaultAddressId, onSucc
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <CalendarDays className="w-5 h-5 text-primary" />
-              {step === "form" && "Book Lawn Service"}
-              {step === "quote" && "Your Quote"}
+              {step === "form" && (isEditMode ? "Edit Booking" : "Book Lawn Service")}
+              {step === "quote" && (isEditMode ? "Updated Quote" : "Your Quote")}
             </DialogTitle>
           </DialogHeader>
 
@@ -593,7 +640,7 @@ const BookingDialog = ({ open, onOpenChange, addresses, defaultAddressId, onSucc
 
               <div className="flex gap-3">
                 <Button variant="outline" className="flex-1" onClick={() => setStep("form")}>
-                  Modify Booking
+                  Modify Details
                 </Button>
                 <Button className="flex-1" size="lg" onClick={handleBookNow} disabled={loading}>
                   {loading ? (
@@ -601,7 +648,7 @@ const BookingDialog = ({ open, onOpenChange, addresses, defaultAddressId, onSucc
                   ) : (
                     <CreditCard className="w-4 h-4 mr-2" />
                   )}
-                  Book Now
+                  {isEditMode ? "Update Booking" : "Book Now"}
                 </Button>
               </div>
             </div>
