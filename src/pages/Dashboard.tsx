@@ -86,20 +86,20 @@ const Dashboard = () => {
   const [alternativeSuggestions, setAlternativeSuggestions] = useState<Record<string, AlternativeSuggestion[]>>({});
 
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        setUser(session?.user ?? null);
-        setIsLoading(false);
-        if (!session?.user) {
-          navigate("/auth");
-        } else {
-          setTimeout(() => {
-            fetchUserData(session.user.id);
-            checkAdminStatus(session.user.id);
-          }, 0);
-        }
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      setUser(session?.user ?? null);
+      setIsLoading(false);
+      if (!session?.user) {
+        navigate("/auth");
+      } else {
+        setTimeout(() => {
+          fetchUserData(session.user.id);
+          checkAdminStatus(session.user.id);
+        }, 0);
       }
-    );
+    });
 
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null);
@@ -128,33 +128,33 @@ const Dashboard = () => {
 
     const { data: bookingData } = await supabase
       .from("bookings")
-      .select(`
+      .select(
+        `
         *,
         contractor:contractors(
           business_name,
           user_id
         )
-      `)
+      `,
+      )
       .eq("user_id", userId)
       .order("scheduled_date", { ascending: false });
 
     if (bookingData) {
       setBookings(bookingData as Booking[]);
-      
+
       // Fetch contractor profile names for bookings with contractors
-      const contractorUserIds = bookingData
-        .filter(b => b.contractor?.user_id)
-        .map(b => b.contractor!.user_id);
-      
+      const contractorUserIds = bookingData.filter((b) => b.contractor?.user_id).map((b) => b.contractor!.user_id);
+
       if (contractorUserIds.length > 0) {
         const { data: profiles } = await supabase
           .from("profiles")
           .select("user_id, full_name")
           .in("user_id", contractorUserIds);
-        
+
         if (profiles) {
           const profileMap: Record<string, string> = {};
-          profiles.forEach(p => {
+          profiles.forEach((p) => {
             if (p.full_name) profileMap[p.user_id] = p.full_name;
           });
           setContractorProfiles(profileMap);
@@ -162,9 +162,7 @@ const Dashboard = () => {
       }
 
       // Fetch alternative suggestions for pending bookings
-      const pendingBookingIds = bookingData
-        .filter(b => b.status === "pending" && !b.contractor_id)
-        .map(b => b.id);
+      const pendingBookingIds = bookingData.filter((b) => b.status === "pending" && !b.contractor_id).map((b) => b.id);
 
       if (pendingBookingIds.length > 0) {
         const { data: suggestionsData } = await supabase
@@ -175,39 +173,43 @@ const Dashboard = () => {
 
         if (suggestionsData && suggestionsData.length > 0) {
           // Fetch contractor details for suggestions
-          const suggestionContractorIds = [...new Set(suggestionsData.map(s => s.contractor_id))];
-          
+          const suggestionContractorIds = [...new Set(suggestionsData.map((s) => s.contractor_id))];
+
           const { data: contractorDetails } = await supabase
             .from("contractors")
             .select("id, business_name, user_id")
             .in("id", suggestionContractorIds);
 
-          const contractorMap = new Map(contractorDetails?.map(c => [c.id, c]) || []);
-          
+          const contractorMap = new Map(contractorDetails?.map((c) => [c.id, c]) || []);
+
           // Fetch profile names for contractors
-          const suggContractorUserIds = contractorDetails?.map(c => c.user_id) || [];
+          const suggContractorUserIds = contractorDetails?.map((c) => c.user_id) || [];
           const { data: suggProfiles } = await supabase
             .from("profiles")
             .select("user_id, full_name")
             .in("user_id", suggContractorUserIds);
 
-          const profileNameMap = new Map(suggProfiles?.map(p => [p.user_id, p.full_name]) || []);
+          const profileNameMap = new Map(suggProfiles?.map((p) => [p.user_id, p.full_name]) || []);
 
           // Group suggestions by booking_id with contractor info
           const suggestionsMap: Record<string, AlternativeSuggestion[]> = {};
-          suggestionsData.forEach(s => {
+          suggestionsData.forEach((s) => {
             const contractor = contractorMap.get(s.contractor_id);
             const enrichedSuggestion: AlternativeSuggestion = {
               ...s,
-              contractor: contractor ? {
-                business_name: contractor.business_name,
-                user_id: contractor.user_id,
-              } : undefined,
-              contractor_profile: contractor ? {
-                full_name: profileNameMap.get(contractor.user_id) || null,
-              } : undefined,
+              contractor: contractor
+                ? {
+                    business_name: contractor.business_name,
+                    user_id: contractor.user_id,
+                  }
+                : undefined,
+              contractor_profile: contractor
+                ? {
+                    full_name: profileNameMap.get(contractor.user_id) || null,
+                  }
+                : undefined,
             };
-            
+
             if (!suggestionsMap[s.booking_id]) {
               suggestionsMap[s.booking_id] = [];
             }
@@ -225,11 +227,7 @@ const Dashboard = () => {
   };
 
   const checkAdminStatus = async (userId: string) => {
-    const { data: roles } = await supabase
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", userId)
-      .eq("role", "admin");
+    const { data: roles } = await supabase.from("user_roles").select("role").eq("user_id", userId).eq("role", "admin");
 
     setIsAdmin(roles && roles.length > 0);
   };
@@ -269,7 +267,7 @@ const Dashboard = () => {
 
   const handleDeleteAddress = async () => {
     if (!deleteAddressId) return;
-    
+
     setIsDeleting(true);
     try {
       // Check if there are any bookings for this address
@@ -278,7 +276,7 @@ const Dashboard = () => {
         .select("id")
         .eq("address_id", deleteAddressId)
         .limit(1);
-      
+
       if (addressBookings && addressBookings.length > 0) {
         toast.error("Cannot delete address with existing bookings");
         setDeleteAddressId(null);
@@ -286,15 +284,12 @@ const Dashboard = () => {
         return;
       }
 
-      const { error } = await supabase
-        .from("addresses")
-        .delete()
-        .eq("id", deleteAddressId);
+      const { error } = await supabase.from("addresses").delete().eq("id", deleteAddressId);
 
       if (error) throw error;
 
       toast.success("Address deleted successfully");
-      setAddresses(addresses.filter(a => a.id !== deleteAddressId));
+      setAddresses(addresses.filter((a) => a.id !== deleteAddressId));
     } catch (error) {
       console.error("Error deleting address:", error);
       toast.error("Failed to delete address");
@@ -306,18 +301,15 @@ const Dashboard = () => {
 
   const handleDeleteBooking = async () => {
     if (!deleteBookingId) return;
-    
+
     setIsDeletingBooking(true);
     try {
-      const { error } = await supabase
-        .from("bookings")
-        .delete()
-        .eq("id", deleteBookingId);
+      const { error } = await supabase.from("bookings").delete().eq("id", deleteBookingId);
 
       if (error) throw error;
 
       toast.success("Booking deleted successfully");
-      setBookings(bookings.filter(b => b.id !== deleteBookingId));
+      setBookings(bookings.filter((b) => b.id !== deleteBookingId));
     } catch (error) {
       console.error("Error deleting booking:", error);
       toast.error("Failed to delete booking");
@@ -339,7 +331,7 @@ const Dashboard = () => {
 
   const getStatusBadge = (status: string) => {
     const config: Record<string, { variant: "default" | "secondary" | "destructive" | "outline"; label: string }> = {
-      pending: { variant: "secondary", label: "Pending Verification" },
+      pending: { variant: "secondary", label: "Pending" },
       verified: { variant: "default", label: "Verified" },
       rejected: { variant: "destructive", label: "Rejected" },
       confirmed: { variant: "default", label: "Confirmed" },
@@ -368,10 +360,10 @@ const Dashboard = () => {
   }
 
   const userName = user?.user_metadata?.full_name || "there";
-  const verifiedAddresses = addresses.filter(a => a.status === "verified");
-  const pendingAddresses = addresses.filter(a => a.status === "pending");
-  const upcomingBookings = bookings.filter(b => b.status === "pending" || b.status === "confirmed");
-  const completedBookings = bookings.filter(b => b.status === "completed");
+  const verifiedAddresses = addresses.filter((a) => a.status === "verified");
+  const pendingAddresses = addresses.filter((a) => a.status === "pending");
+  const upcomingBookings = bookings.filter((b) => b.status === "pending" || b.status === "confirmed");
+  const completedBookings = bookings.filter((b) => b.status === "completed");
 
   return (
     <div className="min-h-screen bg-background">
@@ -394,10 +386,7 @@ const Dashboard = () => {
 
       {/* Mobile Overlay */}
       {sidebarOpen && (
-        <div
-          className="md:hidden fixed inset-0 bg-black/50 z-40"
-          onClick={() => setSidebarOpen(false)}
-        />
+        <div className="md:hidden fixed inset-0 bg-black/50 z-40" onClick={() => setSidebarOpen(false)} />
       )}
 
       {/* Sidebar */}
@@ -411,9 +400,7 @@ const Dashboard = () => {
           <div className="w-10 h-10 rounded-xl gradient-hero flex items-center justify-center shadow-soft">
             <Leaf className="w-5 h-5 text-primary-foreground" />
           </div>
-          <span className="text-xl font-display font-bold text-foreground">
-            Lawnly
-          </span>
+          <span className="text-xl font-display font-bold text-foreground">Lawnly</span>
         </div>
 
         {/* Navigation */}
@@ -463,12 +450,8 @@ const Dashboard = () => {
         {/* Header */}
         <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
           <div>
-            <h1 className="font-display text-xl md:text-2xl font-bold text-foreground">
-              Welcome back, {userName}!
-            </h1>
-            <p className="text-muted-foreground text-sm md:text-base">
-              Manage your lawn care services
-            </p>
+            <h1 className="font-display text-xl md:text-2xl font-bold text-foreground">Welcome back, {userName}!</h1>
+            <p className="text-muted-foreground text-sm md:text-base">Manage your lawn care services</p>
           </div>
           <div className="flex items-center gap-3">
             {user && <NotificationsPopover userId={user.id} />}
@@ -491,12 +474,8 @@ const Dashboard = () => {
                     <MapPin className="w-6 h-6 text-primary" />
                   </div>
                   <div>
-                    <p className="text-2xl font-display font-bold text-foreground">
-                      {verifiedAddresses.length}
-                    </p>
-                    <p className="text-sm text-muted-foreground">
-                      Verified Addresses
-                    </p>
+                    <p className="text-2xl font-display font-bold text-foreground">{verifiedAddresses.length}</p>
+                    <p className="text-sm text-muted-foreground">Verified Addresses</p>
                   </div>
                 </div>
               </div>
@@ -506,12 +485,8 @@ const Dashboard = () => {
                     <Calendar className="w-6 h-6 text-accent-foreground" />
                   </div>
                   <div>
-                    <p className="text-2xl font-display font-bold text-foreground">
-                      {upcomingBookings.length}
-                    </p>
-                    <p className="text-sm text-muted-foreground">
-                      Upcoming Bookings
-                    </p>
+                    <p className="text-2xl font-display font-bold text-foreground">{upcomingBookings.length}</p>
+                    <p className="text-sm text-muted-foreground">Upcoming Bookings</p>
                   </div>
                 </div>
               </div>
@@ -524,12 +499,8 @@ const Dashboard = () => {
                     <Clock className="w-6 h-6 text-grass-dark" />
                   </div>
                   <div>
-                    <p className="text-2xl font-display font-bold text-foreground">
-                      {completedBookings.length}
-                    </p>
-                    <p className="text-sm text-muted-foreground">
-                      Completed Services
-                    </p>
+                    <p className="text-2xl font-display font-bold text-foreground">{completedBookings.length}</p>
+                    <p className="text-sm text-muted-foreground">Completed Services</p>
                   </div>
                 </div>
               </button>
@@ -538,9 +509,7 @@ const Dashboard = () => {
             {/* Getting Started (only if no addresses) */}
             {addresses.length === 0 && (
               <div className="bg-card rounded-2xl p-6 md:p-8 shadow-soft">
-                <h2 className="font-display text-lg md:text-xl font-bold text-foreground mb-6">
-                  Getting Started
-                </h2>
+                <h2 className="font-display text-lg md:text-xl font-bold text-foreground mb-6">Getting Started</h2>
                 <div className="space-y-4">
                   <button
                     onClick={openAddressDialog}
@@ -550,43 +519,27 @@ const Dashboard = () => {
                       <span className="font-display font-bold text-primary">1</span>
                     </div>
                     <div className="flex-1">
-                      <h3 className="font-semibold text-foreground">
-                        Add Your Address
-                      </h3>
-                      <p className="text-sm text-muted-foreground">
-                        Add your property address for verification
-                      </p>
+                      <h3 className="font-semibold text-foreground">Add Your Address</h3>
+                      <p className="text-sm text-muted-foreground">Add your property address for verification</p>
                     </div>
                     <ChevronRight className="w-5 h-5 text-muted-foreground group-hover:text-primary transition-colors" />
                   </button>
                   <div className="flex items-center gap-4 p-4 rounded-xl border border-border opacity-50">
                     <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center">
-                      <span className="font-display font-bold text-muted-foreground">
-                        2
-                      </span>
+                      <span className="font-display font-bold text-muted-foreground">2</span>
                     </div>
                     <div className="flex-1">
-                      <h3 className="font-semibold text-foreground">
-                        Wait for Verification
-                      </h3>
-                      <p className="text-sm text-muted-foreground">
-                        We'll verify your property size and set pricing
-                      </p>
+                      <h3 className="font-semibold text-foreground">Wait for Verification</h3>
+                      <p className="text-sm text-muted-foreground">We'll verify your property size and set pricing</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-4 p-4 rounded-xl border border-border opacity-50">
                     <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center">
-                      <span className="font-display font-bold text-muted-foreground">
-                        3
-                      </span>
+                      <span className="font-display font-bold text-muted-foreground">3</span>
                     </div>
                     <div className="flex-1">
-                      <h3 className="font-semibold text-foreground">
-                        Book Your First Mow
-                      </h3>
-                      <p className="text-sm text-muted-foreground">
-                        Schedule your lawn service at your convenience
-                      </p>
+                      <h3 className="font-semibold text-foreground">Book Your First Mow</h3>
+                      <p className="text-sm text-muted-foreground">Schedule your lawn service at your convenience</p>
                     </div>
                   </div>
                 </div>
@@ -597,9 +550,7 @@ const Dashboard = () => {
             {upcomingBookings.length > 0 && (
               <div className="bg-card rounded-2xl p-6 md:p-8 shadow-soft">
                 <div className="flex items-center justify-between mb-4">
-                  <h2 className="font-display text-lg md:text-xl font-bold text-foreground">
-                    Upcoming Mows
-                  </h2>
+                  <h2 className="font-display text-lg md:text-xl font-bold text-foreground">Upcoming Mows</h2>
                   <Button variant="ghost" size="sm" onClick={() => handleTabChange("bookings")}>
                     View all
                     <ChevronRight className="w-4 h-4 ml-1" />
@@ -607,7 +558,7 @@ const Dashboard = () => {
                 </div>
                 <div className="space-y-3">
                   {upcomingBookings.slice(0, 3).map((booking) => {
-                    const address = addresses.find(a => a.id === booking.address_id);
+                    const address = addresses.find((a) => a.id === booking.address_id);
                     const suggestions = alternativeSuggestions[booking.id] || [];
                     return (
                       <div key={booking.id} className="p-4 rounded-xl border border-border">
@@ -636,11 +587,7 @@ const Dashboard = () => {
                             {getStatusBadge(booking.status)}
                             {canModifyBooking(booking) && (
                               <>
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  onClick={() => handleEditBooking(booking)}
-                                >
+                                <Button size="sm" variant="ghost" onClick={() => handleEditBooking(booking)}>
                                   <Pencil className="w-4 h-4" />
                                 </Button>
                                 <Button
@@ -673,9 +620,7 @@ const Dashboard = () => {
             {addresses.length > 0 && (
               <div className="bg-card rounded-2xl p-6 md:p-8 shadow-soft">
                 <div className="flex items-center justify-between mb-4">
-                  <h2 className="font-display text-lg md:text-xl font-bold text-foreground">
-                    My Addresses
-                  </h2>
+                  <h2 className="font-display text-lg md:text-xl font-bold text-foreground">My Addresses</h2>
                   <Button size="sm" onClick={openAddressDialog}>
                     <Plus className="w-4 h-4" />
                     <span className="hidden sm:inline ml-1">Add Address</span>
@@ -735,15 +680,10 @@ const Dashboard = () => {
           </div>
         )}
 
-
-
-
         {activeTab === "bookings" && (
           <div className="space-y-6">
             <div className="flex items-center justify-between">
-              <h2 className="font-display text-lg md:text-xl font-bold text-foreground">
-                My Bookings
-              </h2>
+              <h2 className="font-display text-lg md:text-xl font-bold text-foreground">My Bookings</h2>
               <Button size="sm" disabled={verifiedAddresses.length === 0}>
                 <Plus className="w-4 h-4" />
                 <span className="hidden sm:inline">New Booking</span>
@@ -755,9 +695,7 @@ const Dashboard = () => {
                 <div className="w-16 h-16 mx-auto mb-6 rounded-full bg-muted flex items-center justify-center">
                   <Calendar className="w-8 h-8 text-muted-foreground" />
                 </div>
-                <h3 className="font-display text-lg md:text-xl font-semibold text-foreground mb-2">
-                  No bookings yet
-                </h3>
+                <h3 className="font-display text-lg md:text-xl font-semibold text-foreground mb-2">No bookings yet</h3>
                 <p className="text-muted-foreground mb-6 max-w-md mx-auto text-sm md:text-base">
                   {verifiedAddresses.length > 0
                     ? "You have verified addresses ready for booking. Schedule your first lawn care service!"
@@ -778,7 +716,7 @@ const Dashboard = () => {
             ) : (
               <div className="space-y-4">
                 {bookings.map((booking) => {
-                  const address = addresses.find(a => a.id === booking.address_id);
+                  const address = addresses.find((a) => a.id === booking.address_id);
                   const suggestions = alternativeSuggestions[booking.id] || [];
                   return (
                     <div key={booking.id} className="bg-card rounded-2xl p-6 shadow-soft">
@@ -806,14 +744,10 @@ const Dashboard = () => {
                             )}
                             <div className="flex items-center gap-3 mt-2">
                               {booking.total_price && (
-                                <p className="text-sm font-medium text-primary">
-                                  Total: ${booking.total_price}
-                                </p>
+                                <p className="text-sm font-medium text-primary">Total: ${booking.total_price}</p>
                               )}
                               {booking.time_slot && (
-                                <p className="text-sm text-muted-foreground">
-                                  • {booking.time_slot}
-                                </p>
+                                <p className="text-sm text-muted-foreground">• {booking.time_slot}</p>
                               )}
                             </div>
                             {booking.contractor_id && booking.contractor && (
@@ -821,8 +755,8 @@ const Dashboard = () => {
                                 <span className="font-medium">
                                   {booking.status === "completed" ? "Completed by:" : "Assigned to:"}
                                 </span>
-                                {booking.contractor.business_name || 
-                                  contractorProfiles[booking.contractor.user_id] || 
+                                {booking.contractor.business_name ||
+                                  contractorProfiles[booking.contractor.user_id] ||
                                   "Contractor"}
                               </p>
                             )}
@@ -830,11 +764,7 @@ const Dashboard = () => {
                         </div>
                         {canModifyBooking(booking) && (
                           <div className="flex items-center gap-2">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleEditBooking(booking)}
-                            >
+                            <Button size="sm" variant="outline" onClick={() => handleEditBooking(booking)}>
                               <Pencil className="w-4 h-4" />
                               <span className="hidden sm:inline ml-1">Edit</span>
                             </Button>
@@ -866,11 +796,7 @@ const Dashboard = () => {
       </main>
 
       {/* Add Address Dialog */}
-      <AddAddressDialog
-        open={addressDialogOpen}
-        onOpenChange={setAddressDialogOpen}
-        onSuccess={handleAddressAdded}
-      />
+      <AddAddressDialog open={addressDialogOpen} onOpenChange={setAddressDialogOpen} onSuccess={handleAddressAdded} />
 
       {/* Booking Dialog */}
       <BookingDialog
