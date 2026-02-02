@@ -389,6 +389,34 @@ const BookingDialog = ({ open, onOpenChange, addresses, defaultAddressId, onSucc
     onOpenChange(false);
   };
 
+  const handlePaymentDialogClose = async (open: boolean) => {
+    if (!open && createdBookingId) {
+      // Payment dialog was closed without completing payment - delete the unpaid booking
+      try {
+        const { data: booking } = await supabase
+          .from("bookings")
+          .select("payment_status")
+          .eq("id", createdBookingId)
+          .single();
+
+        if (booking?.payment_status === "unpaid") {
+          await supabase
+            .from("bookings")
+            .delete()
+            .eq("id", createdBookingId);
+          
+          toast.info("Booking cancelled - payment was not completed");
+        }
+      } catch (error) {
+        console.error("Error cleaning up booking:", error);
+      }
+      
+      setCreatedBookingId(null);
+      setClientSecret(null);
+    }
+    setPaymentDialogOpen(open);
+  };
+
   const handleAddAddressSuccess = () => {
     setAddAddressDialogOpen(false);
     onAddressAdded?.();
@@ -658,7 +686,7 @@ const BookingDialog = ({ open, onOpenChange, addresses, defaultAddressId, onSucc
         {/* Payment Dialog */}
         <PaymentDialog
           open={paymentDialogOpen}
-          onOpenChange={setPaymentDialogOpen}
+          onOpenChange={handlePaymentDialogClose}
           amount={totalWithGst}
           onPaymentSuccess={handlePaymentSuccess}
           clientSecret={clientSecret}
