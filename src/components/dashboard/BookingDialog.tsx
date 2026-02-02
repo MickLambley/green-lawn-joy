@@ -185,10 +185,14 @@ const BookingDialog = ({ open, onOpenChange, addresses, defaultAddressId, onSucc
 
     if (contractorsData) {
       // Filter contractors by service area (check if address city/state is in their service areas)
+      // If service_areas is empty, assume contractor serves all areas
       const filteredContractors = contractorsData.filter(c => 
+        c.service_areas.length === 0 ||
         c.service_areas.some((area: string) => 
           area.toLowerCase().includes(selectedAddress.city.toLowerCase()) ||
           area.toLowerCase().includes(selectedAddress.state.toLowerCase()) ||
+          selectedAddress.city.toLowerCase().includes(area.toLowerCase()) ||
+          selectedAddress.state.toLowerCase().includes(area.toLowerCase()) ||
           area.toLowerCase() === "all"
         )
       );
