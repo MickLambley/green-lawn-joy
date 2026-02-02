@@ -19,6 +19,7 @@ import {
   Shield,
   Bell,
   Trash2,
+  Pencil,
 } from "lucide-react";
 import {
   AlertDialog,
@@ -55,6 +56,9 @@ const Dashboard = () => {
   const [isAdmin, setIsAdmin] = useState(false);
   const [deleteAddressId, setDeleteAddressId] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [editingBooking, setEditingBooking] = useState<Booking | null>(null);
+  const [deleteBookingId, setDeleteBookingId] = useState<string | null>(null);
+  const [isDeletingBooking, setIsDeletingBooking] = useState(false);
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
@@ -186,6 +190,39 @@ const Dashboard = () => {
       setDeleteAddressId(null);
       setIsDeleting(false);
     }
+  };
+
+  const handleDeleteBooking = async () => {
+    if (!deleteBookingId) return;
+    
+    setIsDeletingBooking(true);
+    try {
+      const { error } = await supabase
+        .from("bookings")
+        .delete()
+        .eq("id", deleteBookingId);
+
+      if (error) throw error;
+
+      toast.success("Booking deleted successfully");
+      setBookings(bookings.filter(b => b.id !== deleteBookingId));
+    } catch (error) {
+      console.error("Error deleting booking:", error);
+      toast.error("Failed to delete booking");
+    } finally {
+      setDeleteBookingId(null);
+      setIsDeletingBooking(false);
+    }
+  };
+
+  const handleEditBooking = (booking: Booking) => {
+    setEditingBooking(booking);
+    setBookingDialogOpen(true);
+  };
+
+  const canModifyBooking = (booking: Booking): boolean => {
+    // Can edit/delete if no contractor has been assigned yet
+    return !booking.contractor_id && booking.status !== "completed" && booking.status !== "cancelled";
   };
 
   const getStatusBadge = (status: string) => {
@@ -630,13 +667,45 @@ const Dashboard = () => {
                                 {address.street_address}, {address.city}
                               </p>
                             )}
-                            {booking.total_price && (
-                              <p className="text-sm font-medium text-primary mt-2">
-                                Total: ${booking.total_price}
+                            <div className="flex items-center gap-3 mt-2">
+                              {booking.total_price && (
+                                <p className="text-sm font-medium text-primary">
+                                  Total: ${booking.total_price}
+                                </p>
+                              )}
+                              {booking.time_slot && (
+                                <p className="text-sm text-muted-foreground">
+                                  • {booking.time_slot}
+                                </p>
+                              )}
+                            </div>
+                            {!canModifyBooking(booking) && booking.contractor_id && (
+                              <p className="text-xs text-muted-foreground mt-1">
+                                Contractor assigned
                               </p>
                             )}
                           </div>
                         </div>
+                        {canModifyBooking(booking) && (
+                          <div className="flex items-center gap-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleEditBooking(booking)}
+                            >
+                              <Pencil className="w-4 h-4" />
+                              <span className="hidden sm:inline ml-1">Edit</span>
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                              onClick={() => setDeleteBookingId(booking.id)}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        )}
                       </div>
                     </div>
                   );
@@ -657,11 +726,15 @@ const Dashboard = () => {
       {/* Booking Dialog */}
       <BookingDialog
         open={bookingDialogOpen}
-        onOpenChange={setBookingDialogOpen}
+        onOpenChange={(open) => {
+          setBookingDialogOpen(open);
+          if (!open) setEditingBooking(null);
+        }}
         addresses={addresses}
         defaultAddressId={selectedAddressIdForBooking}
         onSuccess={handleBookingSuccess}
         onAddressAdded={handleAddressAdded}
+        editingBooking={editingBooking}
       />
 
       {/* Completed Services Dialog */}
@@ -690,6 +763,28 @@ const Dashboard = () => {
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               {isDeleting ? "Deleting..." : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Delete Booking Confirmation Dialog */}
+      <AlertDialog open={!!deleteBookingId} onOpenChange={(open) => !open && setDeleteBookingId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Booking</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this booking? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeletingBooking}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteBooking}
+              disabled={isDeletingBooking}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isDeletingBooking ? "Deleting..." : "Delete"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
