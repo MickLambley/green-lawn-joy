@@ -204,9 +204,9 @@ const ContractorDashboard = () => {
         });
 
       if (suggestionError) {
-        // Check if it's a duplicate
+        // Check if it's a duplicate date/time
         if (suggestionError.code === "23505") {
-          toast.error("You have already suggested an alternative time for this job");
+          toast.error("This date and time has already been suggested for this job");
           return;
         }
         throw suggestionError;
