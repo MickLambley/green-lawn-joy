@@ -36,7 +36,25 @@ import AddAddressDialog from "@/components/dashboard/AddAddressDialog";
 import BookingDialog from "@/components/dashboard/BookingDialog";
 import NotificationsPopover from "@/components/dashboard/NotificationsPopover";
 import CompletedServicesDialog from "@/components/dashboard/CompletedServicesDialog";
+import { AlternativeSuggestionsCard } from "@/components/dashboard/AlternativeSuggestionsCard";
 import type { Database } from "@/integrations/supabase/types";
+
+type AlternativeSuggestion = {
+  id: string;
+  booking_id: string;
+  contractor_id: string;
+  suggested_date: string;
+  suggested_time_slot: string;
+  status: string;
+  created_at: string;
+  contractor?: {
+    business_name: string | null;
+    user_id: string;
+  };
+  contractor_profile?: {
+    full_name: string | null;
+  };
+};
 
 type Address = Database["public"]["Tables"]["addresses"]["Row"];
 type Booking = Database["public"]["Tables"]["bookings"]["Row"] & {
@@ -65,6 +83,7 @@ const Dashboard = () => {
   const [deleteBookingId, setDeleteBookingId] = useState<string | null>(null);
   const [isDeletingBooking, setIsDeletingBooking] = useState(false);
   const [contractorProfiles, setContractorProfiles] = useState<Record<string, string>>({});
+  const [alternativeSuggestions, setAlternativeSuggestions] = useState<Record<string, AlternativeSuggestion[]>>({});
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
@@ -140,6 +159,67 @@ const Dashboard = () => {
           });
           setContractorProfiles(profileMap);
         }
+      }
+
+      // Fetch alternative suggestions for pending bookings
+      const pendingBookingIds = bookingData
+        .filter(b => b.status === "pending" && !b.contractor_id)
+        .map(b => b.id);
+
+      if (pendingBookingIds.length > 0) {
+        const { data: suggestionsData } = await supabase
+          .from("alternative_suggestions")
+          .select("*")
+          .in("booking_id", pendingBookingIds)
+          .eq("status", "pending");
+
+        if (suggestionsData && suggestionsData.length > 0) {
+          // Fetch contractor details for suggestions
+          const suggestionContractorIds = [...new Set(suggestionsData.map(s => s.contractor_id))];
+          
+          const { data: contractorDetails } = await supabase
+            .from("contractors")
+            .select("id, business_name, user_id")
+            .in("id", suggestionContractorIds);
+
+          const contractorMap = new Map(contractorDetails?.map(c => [c.id, c]) || []);
+          
+          // Fetch profile names for contractors
+          const suggContractorUserIds = contractorDetails?.map(c => c.user_id) || [];
+          const { data: suggProfiles } = await supabase
+            .from("profiles")
+            .select("user_id, full_name")
+            .in("user_id", suggContractorUserIds);
+
+          const profileNameMap = new Map(suggProfiles?.map(p => [p.user_id, p.full_name]) || []);
+
+          // Group suggestions by booking_id with contractor info
+          const suggestionsMap: Record<string, AlternativeSuggestion[]> = {};
+          suggestionsData.forEach(s => {
+            const contractor = contractorMap.get(s.contractor_id);
+            const enrichedSuggestion: AlternativeSuggestion = {
+              ...s,
+              contractor: contractor ? {
+                business_name: contractor.business_name,
+                user_id: contractor.user_id,
+              } : undefined,
+              contractor_profile: contractor ? {
+                full_name: profileNameMap.get(contractor.user_id) || null,
+              } : undefined,
+            };
+            
+            if (!suggestionsMap[s.booking_id]) {
+              suggestionsMap[s.booking_id] = [];
+            }
+            suggestionsMap[s.booking_id].push(enrichedSuggestion);
+          });
+
+          setAlternativeSuggestions(suggestionsMap);
+        } else {
+          setAlternativeSuggestions({});
+        }
+      } else {
+        setAlternativeSuggestions({});
       }
     }
   };
@@ -528,50 +608,60 @@ const Dashboard = () => {
                 <div className="space-y-3">
                   {upcomingBookings.slice(0, 3).map((booking) => {
                     const address = addresses.find(a => a.id === booking.address_id);
+                    const suggestions = alternativeSuggestions[booking.id] || [];
                     return (
-                      <div key={booking.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-xl border border-border gap-3">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-lg bg-accent/20 flex items-center justify-center flex-shrink-0">
-                            <Calendar className="w-5 h-5 text-accent-foreground" />
-                          </div>
-                          <div>
-                            <p className="font-medium">
-                              {new Date(booking.scheduled_date).toLocaleDateString("en-AU", {
-                                weekday: "short",
-                                day: "numeric",
-                                month: "short",
-                              })}
-                              {booking.time_slot && ` • ${booking.time_slot}`}
-                            </p>
-                            {address && (
-                              <p className="text-sm text-muted-foreground">
-                                {address.street_address}, {address.city}
+                      <div key={booking.id} className="p-4 rounded-xl border border-border">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-lg bg-accent/20 flex items-center justify-center flex-shrink-0">
+                              <Calendar className="w-5 h-5 text-accent-foreground" />
+                            </div>
+                            <div>
+                              <p className="font-medium">
+                                {new Date(booking.scheduled_date).toLocaleDateString("en-AU", {
+                                  weekday: "short",
+                                  day: "numeric",
+                                  month: "short",
+                                })}
+                                {booking.time_slot && ` • ${booking.time_slot}`}
                               </p>
+                              {address && (
+                                <p className="text-sm text-muted-foreground">
+                                  {address.street_address}, {address.city}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {getStatusBadge(booking.status)}
+                            {canModifyBooking(booking) && (
+                              <>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => handleEditBooking(booking)}
+                                >
+                                  <Pencil className="w-4 h-4" />
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                                  onClick={() => setDeleteBookingId(booking.id)}
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              </>
                             )}
                           </div>
                         </div>
-                        <div className="flex items-center gap-2">
-                          {getStatusBadge(booking.status)}
-                          {canModifyBooking(booking) && (
-                            <>
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => handleEditBooking(booking)}
-                              >
-                                <Pencil className="w-4 h-4" />
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                                onClick={() => setDeleteBookingId(booking.id)}
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </Button>
-                            </>
-                          )}
-                        </div>
+                        {suggestions.length > 0 && (
+                          <AlternativeSuggestionsCard
+                            suggestions={suggestions}
+                            bookingId={booking.id}
+                            onSuggestionResponse={() => user && fetchUserData(user.id)}
+                          />
+                        )}
                       </div>
                     );
                   })}
@@ -689,6 +779,7 @@ const Dashboard = () => {
               <div className="space-y-4">
                 {bookings.map((booking) => {
                   const address = addresses.find(a => a.id === booking.address_id);
+                  const suggestions = alternativeSuggestions[booking.id] || [];
                   return (
                     <div key={booking.id} className="bg-card rounded-2xl p-6 shadow-soft">
                       <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
@@ -758,6 +849,13 @@ const Dashboard = () => {
                           </div>
                         )}
                       </div>
+                      {suggestions.length > 0 && (
+                        <AlternativeSuggestionsCard
+                          suggestions={suggestions}
+                          bookingId={booking.id}
+                          onSuggestionResponse={() => user && fetchUserData(user.id)}
+                        />
+                      )}
                     </div>
                   );
                 })}

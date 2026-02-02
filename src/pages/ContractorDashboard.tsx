@@ -191,26 +191,55 @@ const ContractorDashboard = () => {
   const handleSuggestAlternative = async () => {
     if (!contractor || !selectedJob || !suggestedDate) return;
 
-    const { error } = await supabase
-      .from("bookings")
-      .update({
-        alternative_date: suggestedDate.toISOString().split("T")[0],
-        alternative_time_slot: suggestedTimeSlot,
-        alternative_suggested_by: contractor.id,
-        alternative_suggested_at: new Date().toISOString(),
-      })
-      .eq("id", selectedJob.id);
+    try {
+      // Insert into alternative_suggestions table
+      const { error: suggestionError } = await supabase
+        .from("alternative_suggestions")
+        .insert({
+          booking_id: selectedJob.id,
+          contractor_id: contractor.id,
+          suggested_date: suggestedDate.toISOString().split("T")[0],
+          suggested_time_slot: suggestedTimeSlot,
+          status: "pending",
+        });
 
-    if (error) {
+      if (suggestionError) {
+        // Check if it's a duplicate
+        if (suggestionError.code === "23505") {
+          toast.error("You have already suggested an alternative time for this job");
+          return;
+        }
+        throw suggestionError;
+      }
+
+      // Notify the customer
+      const { error: notificationError } = await supabase
+        .from("notifications")
+        .insert({
+          user_id: selectedJob.user_id,
+          title: "Alternative Time Suggested",
+          message: `A contractor has suggested an alternative time: ${suggestedDate.toLocaleDateString("en-AU", {
+            weekday: "long",
+            month: "long",
+            day: "numeric"
+          })} at ${timeSlots.find(t => t.value === suggestedTimeSlot)?.label || suggestedTimeSlot}. Please review and respond.`,
+          type: "info",
+          booking_id: selectedJob.id,
+        });
+
+      if (notificationError) {
+        console.error("Failed to send notification:", notificationError);
+      }
+
+      toast.success("Alternative date suggested! The customer will be notified.");
+      setSuggestDialogOpen(false);
+      setSelectedJob(null);
+      setSuggestedDate(undefined);
+      fetchJobs(contractor);
+    } catch (error) {
+      console.error("Error suggesting alternative:", error);
       toast.error("Failed to suggest alternative");
-      return;
     }
-
-    toast.success("Alternative date suggested! Waiting for customer response.");
-    setSuggestDialogOpen(false);
-    setSelectedJob(null);
-    setSuggestedDate(undefined);
-    fetchJobs(contractor);
   };
 
   const handleCompleteJob = async (booking: BookingWithAddress) => {
