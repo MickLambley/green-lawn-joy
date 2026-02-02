@@ -27,6 +27,9 @@ const LawnDrawingMap = ({ address, onAreaCalculated }: LawnDrawingMapProps) => {
   const [error, setError] = useState<string | null>(null);
   const [isScriptLoaded, setIsScriptLoaded] = useState(false);
 
+  const onAreaCalculatedRef = useRef(onAreaCalculated);
+  onAreaCalculatedRef.current = onAreaCalculated;
+
   const calculatePolygonArea = useCallback((polygon: google.maps.Polygon): number => {
     const path = polygon.getPath();
     if (path.getLength() < 3) return 0;
@@ -40,8 +43,8 @@ const LawnDrawingMap = ({ address, onAreaCalculated }: LawnDrawingMapProps) => {
     });
     const roundedTotal = Math.round(total);
     setTotalArea(roundedTotal);
-    onAreaCalculated(roundedTotal);
-  }, [calculatePolygonArea, onAreaCalculated]);
+    onAreaCalculatedRef.current(roundedTotal);
+  }, [calculatePolygonArea]);
 
   const clearAllDrawings = useCallback(() => {
     polygonsRef.current.forEach((polygon) => {
@@ -49,8 +52,8 @@ const LawnDrawingMap = ({ address, onAreaCalculated }: LawnDrawingMapProps) => {
     });
     polygonsRef.current = [];
     setTotalArea(0);
-    onAreaCalculated(0);
-  }, [onAreaCalculated]);
+    onAreaCalculatedRef.current(0);
+  }, []);
 
   // Load Google Maps script
   useEffect(() => {
@@ -77,7 +80,10 @@ const LawnDrawingMap = ({ address, onAreaCalculated }: LawnDrawingMapProps) => {
 
   // Initialize map when script is loaded
   useEffect(() => {
-    if (!isScriptLoaded || !mapRef.current || mapInstanceRef.current) return;
+    if (!isScriptLoaded || !mapRef.current) return;
+    
+    // Prevent re-initialization
+    if (mapInstanceRef.current) return;
 
     const map = new google.maps.Map(mapRef.current, {
       center: { lat: -33.8688, lng: 151.2093 }, // Default to Sydney
@@ -127,22 +133,31 @@ const LawnDrawingMap = ({ address, onAreaCalculated }: LawnDrawingMapProps) => {
       google.maps.event.addListener(polygon.getPath(), "remove_at", recalculateTotalArea);
       google.maps.event.addListener(polygon, "dragend", recalculateTotalArea);
 
-      // Switch back to hand mode after drawing
-      drawingManager.setDrawingMode(null);
+      // Keep drawing mode active for multiple polygons
+      drawingManager.setDrawingMode(google.maps.drawing.OverlayType.POLYGON);
     });
 
-    // Geocode the address
+    setIsLoading(false);
+  }, [isScriptLoaded, recalculateTotalArea]);
+
+  // Geocode the address separately
+  useEffect(() => {
+    if (!isScriptLoaded || !mapInstanceRef.current || !address) return;
+
     const geocoder = new google.maps.Geocoder();
     geocoder.geocode({ address: address + ", Australia" }, (results, status) => {
-      setIsLoading(false);
       if (status === google.maps.GeocoderStatus.OK && results && results[0]) {
-        map.setCenter(results[0].geometry.location);
-        map.setZoom(20);
+        mapInstanceRef.current?.setCenter(results[0].geometry.location);
+        mapInstanceRef.current?.setZoom(20);
+        setError(null);
       } else {
         setError("Could not find address location. Please adjust the map manually.");
       }
     });
+  }, [isScriptLoaded, address]);
 
+  // Cleanup on unmount only
+  useEffect(() => {
     return () => {
       if (drawingManagerRef.current) {
         drawingManagerRef.current.setMap(null);
@@ -150,7 +165,7 @@ const LawnDrawingMap = ({ address, onAreaCalculated }: LawnDrawingMapProps) => {
       polygonsRef.current.forEach((polygon) => polygon.setMap(null));
       polygonsRef.current = [];
     };
-  }, [isScriptLoaded, address, recalculateTotalArea]);
+  }, []);
 
   return (
     <div className="space-y-4">
