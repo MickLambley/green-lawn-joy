@@ -34,6 +34,8 @@ import {
   X,
   CalendarClock,
   Briefcase,
+  AlertCircle,
+  Clock as ClockIcon2,
 } from "lucide-react";
 import { toast } from "sonner";
 import type { Database } from "@/integrations/supabase/types";
@@ -100,13 +102,23 @@ const ContractorDashboard = () => {
 
     if (!contractorData) {
       toast.error("Contractor profile not found");
-      navigate("/auth");
+      navigate("/contractor-auth");
+      return;
+    }
+
+    // Check if onboarding is complete
+    if (!contractorData.abn) {
+      navigate("/contractor-onboarding");
       return;
     }
 
     setContractor(contractorData);
     setIsLoading(false);
-    fetchJobs(contractorData);
+    
+    // Only fetch jobs if approved
+    if (contractorData.approval_status === "approved") {
+      fetchJobs(contractorData);
+    }
   };
 
   const fetchJobs = async (contractorData: Contractor) => {
@@ -281,6 +293,10 @@ const ContractorDashboard = () => {
     );
   }
 
+  // Check if contractor is pending approval
+  const isPendingApproval = contractor?.approval_status === "pending";
+  const isRejected = contractor?.approval_status === "rejected";
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -310,7 +326,61 @@ const ContractorDashboard = () => {
       </header>
 
       <main className="container mx-auto px-4 py-8">
-        {/* Stats */}
+        {/* Pending Approval Message */}
+        {isPendingApproval && (
+          <Card className="mb-8 border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-900/20">
+            <CardContent className="pt-6">
+              <div className="flex items-start gap-4">
+                <div className="p-3 rounded-xl bg-amber-100 dark:bg-amber-800/30">
+                  <ClockIcon2 className="w-6 h-6 text-amber-600 dark:text-amber-400" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-amber-800 dark:text-amber-200 mb-1">
+                    Application Under Review
+                  </h3>
+                  <p className="text-amber-700 dark:text-amber-300 text-sm mb-3">
+                    Your contractor application is currently being reviewed by our team. 
+                    This typically takes 1-2 business days. Once approved, you'll be able 
+                    to view and accept jobs in your area.
+                  </p>
+                  <div className="text-sm text-amber-600 dark:text-amber-400">
+                    <p><strong>Business Name:</strong> {contractor?.business_name}</p>
+                    <p><strong>ABN:</strong> {contractor?.abn}</p>
+                    <p><strong>Service Areas:</strong> {contractor?.service_areas?.length || 0} suburbs</p>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Rejected Message */}
+        {isRejected && (
+          <Card className="mb-8 border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-900/20">
+            <CardContent className="pt-6">
+              <div className="flex items-start gap-4">
+                <div className="p-3 rounded-xl bg-red-100 dark:bg-red-800/30">
+                  <AlertCircle className="w-6 h-6 text-red-600 dark:text-red-400" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-red-800 dark:text-red-200 mb-1">
+                    Application Not Approved
+                  </h3>
+                  <p className="text-red-700 dark:text-red-300 text-sm">
+                    Unfortunately, your contractor application was not approved. 
+                    Please contact our support team if you have any questions or 
+                    would like to reapply.
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Only show dashboard content if approved */}
+        {!isPendingApproval && !isRejected && (
+          <>
+            {/* Stats */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
           <Card>
             <CardContent className="pt-6">
@@ -518,6 +588,8 @@ const ContractorDashboard = () => {
             )}
           </CardContent>
         </Card>
+          </>
+        )}
       </main>
 
       {/* Suggest Alternative Dialog */}

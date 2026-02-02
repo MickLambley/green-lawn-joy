@@ -229,32 +229,65 @@ export type Database = {
       }
       contractors: {
         Row: {
+          abn: string | null
+          applied_at: string | null
+          approval_status: string
+          approved_at: string | null
+          approved_by: string | null
+          business_address: string | null
           business_name: string | null
           created_at: string
           id: string
+          insurance_certificate_url: string | null
           is_active: boolean
           phone: string | null
+          questionnaire_responses: Json | null
           service_areas: string[]
+          service_center_lat: number | null
+          service_center_lng: number | null
+          service_radius_km: number | null
           updated_at: string
           user_id: string
         }
         Insert: {
+          abn?: string | null
+          applied_at?: string | null
+          approval_status?: string
+          approved_at?: string | null
+          approved_by?: string | null
+          business_address?: string | null
           business_name?: string | null
           created_at?: string
           id?: string
+          insurance_certificate_url?: string | null
           is_active?: boolean
           phone?: string | null
+          questionnaire_responses?: Json | null
           service_areas?: string[]
+          service_center_lat?: number | null
+          service_center_lng?: number | null
+          service_radius_km?: number | null
           updated_at?: string
           user_id: string
         }
         Update: {
+          abn?: string | null
+          applied_at?: string | null
+          approval_status?: string
+          approved_at?: string | null
+          approved_by?: string | null
+          business_address?: string | null
           business_name?: string | null
           created_at?: string
           id?: string
+          insurance_certificate_url?: string | null
           is_active?: boolean
           phone?: string | null
+          questionnaire_responses?: Json | null
           service_areas?: string[]
+          service_center_lat?: number | null
+          service_center_lng?: number | null
+          service_radius_km?: number | null
           updated_at?: string
           user_id?: string
         }

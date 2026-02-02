@@ -7,6 +7,8 @@ import Index from "./pages/Index";
 import About from "./pages/About";
 import Contractors from "./pages/Contractors";
 import Auth from "./pages/Auth";
+import ContractorAuth from "./pages/ContractorAuth";
+import ContractorOnboarding from "./pages/ContractorOnboarding";
 import Dashboard from "./pages/Dashboard";
 import Admin from "./pages/Admin";
 import ContractorDashboard from "./pages/ContractorDashboard";
@@ -27,6 +29,8 @@ const App = () => (
           <Route path="/about" element={<About />} />
           <Route path="/contractors" element={<Contractors />} />
           <Route path="/auth" element={<Auth />} />
+          <Route path="/contractor-auth" element={<ContractorAuth />} />
+          <Route path="/contractor-onboarding" element={<ContractorOnboarding />} />
           <Route path="/dashboard" element={
             <ProtectedRoute redirectTo="/auth">
               <Dashboard />

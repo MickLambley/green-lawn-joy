@@ -53,12 +53,12 @@ const Contractors = () => {
                 with customers in your area and earn on your own schedule.
               </p>
               <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                <Link to="/auth?mode=signup&role=contractor">
+                <Link to="/contractor-auth?mode=signup">
                   <Button size="lg" className="w-full sm:w-auto">
                     Apply Now
                   </Button>
                 </Link>
-                <Link to="/auth?role=contractor">
+                <Link to="/contractor-auth">
                   <Button size="lg" variant="outline" className="w-full sm:w-auto">
                     Contractor Login
                   </Button>
@@ -138,7 +138,7 @@ const Contractors = () => {
                 Apply today and start earning with Lawnly. Our team will review 
                 your application and get back to you within 48 hours.
               </p>
-              <Link to="/auth?mode=signup&role=contractor">
+              <Link to="/contractor-auth?mode=signup">
                 <Button size="lg">
                   Apply to Be a Contractor
                 </Button>
