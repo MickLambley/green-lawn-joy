@@ -77,6 +77,54 @@ export type Database = {
         }
         Relationships: []
       }
+      alternative_suggestions: {
+        Row: {
+          booking_id: string
+          contractor_id: string
+          created_at: string
+          id: string
+          responded_at: string | null
+          status: string
+          suggested_date: string
+          suggested_time_slot: string
+        }
+        Insert: {
+          booking_id: string
+          contractor_id: string
+          created_at?: string
+          id?: string
+          responded_at?: string | null
+          status?: string
+          suggested_date: string
+          suggested_time_slot: string
+        }
+        Update: {
+          booking_id?: string
+          contractor_id?: string
+          created_at?: string
+          id?: string
+          responded_at?: string | null
+          status?: string
+          suggested_date?: string
+          suggested_time_slot?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "alternative_suggestions_booking_id_fkey"
+            columns: ["booking_id"]
+            isOneToOne: false
+            referencedRelation: "bookings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "alternative_suggestions_contractor_id_fkey"
+            columns: ["contractor_id"]
+            isOneToOne: false
+            referencedRelation: "contractors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       bookings: {
         Row: {
           address_id: string
