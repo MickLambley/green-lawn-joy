@@ -39,7 +39,12 @@ import CompletedServicesDialog from "@/components/dashboard/CompletedServicesDia
 import type { Database } from "@/integrations/supabase/types";
 
 type Address = Database["public"]["Tables"]["addresses"]["Row"];
-type Booking = Database["public"]["Tables"]["bookings"]["Row"];
+type Booking = Database["public"]["Tables"]["bookings"]["Row"] & {
+  contractor?: {
+    business_name: string | null;
+    user_id: string;
+  } | null;
+};
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -59,6 +64,7 @@ const Dashboard = () => {
   const [editingBooking, setEditingBooking] = useState<Booking | null>(null);
   const [deleteBookingId, setDeleteBookingId] = useState<string | null>(null);
   const [isDeletingBooking, setIsDeletingBooking] = useState(false);
+  const [contractorProfiles, setContractorProfiles] = useState<Record<string, string>>({});
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
@@ -103,12 +109,38 @@ const Dashboard = () => {
 
     const { data: bookingData } = await supabase
       .from("bookings")
-      .select("*")
+      .select(`
+        *,
+        contractor:contractors(
+          business_name,
+          user_id
+        )
+      `)
       .eq("user_id", userId)
       .order("scheduled_date", { ascending: false });
 
     if (bookingData) {
-      setBookings(bookingData);
+      setBookings(bookingData as Booking[]);
+      
+      // Fetch contractor profile names for bookings with contractors
+      const contractorUserIds = bookingData
+        .filter(b => b.contractor?.user_id)
+        .map(b => b.contractor!.user_id);
+      
+      if (contractorUserIds.length > 0) {
+        const { data: profiles } = await supabase
+          .from("profiles")
+          .select("user_id, full_name")
+          .in("user_id", contractorUserIds);
+        
+        if (profiles) {
+          const profileMap: Record<string, string> = {};
+          profiles.forEach(p => {
+            if (p.full_name) profileMap[p.user_id] = p.full_name;
+          });
+          setContractorProfiles(profileMap);
+        }
+      }
     }
   };
 
@@ -679,9 +711,14 @@ const Dashboard = () => {
                                 </p>
                               )}
                             </div>
-                            {!canModifyBooking(booking) && booking.contractor_id && (
-                              <p className="text-xs text-muted-foreground mt-1">
-                                Contractor assigned
+                            {booking.contractor_id && booking.contractor && (
+                              <p className="text-sm text-muted-foreground mt-1 flex items-center gap-1">
+                                <span className="font-medium">
+                                  {booking.status === "completed" ? "Completed by:" : "Assigned to:"}
+                                </span>
+                                {booking.contractor.business_name || 
+                                  contractorProfiles[booking.contractor.user_id] || 
+                                  "Contractor"}
                               </p>
                             )}
                           </div>
