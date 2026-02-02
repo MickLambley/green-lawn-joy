@@ -455,12 +455,6 @@ const Dashboard = () => {
           </div>
           <div className="flex items-center gap-3">
             {user && <NotificationsPopover userId={user.id} />}
-            {isAdmin && (
-              <Button variant="outline" size="sm" onClick={() => navigate("/admin")}>
-                <Shield className="w-4 h-4" />
-                <span className="hidden sm:inline">Admin</span>
-              </Button>
-            )}
           </div>
         </header>
 
