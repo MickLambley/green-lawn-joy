@@ -30,9 +30,10 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
-import { Leaf, LogOut, MapPin, Calendar, Check, X, Eye, Settings, Users } from "lucide-react";
+import { Leaf, LogOut, MapPin, Calendar, Check, X, Eye, Settings, Users, ClipboardList } from "lucide-react";
 import PricingSettingsTab from "@/components/admin/PricingSettingsTab";
 import ContractorManagementTab from "@/components/admin/ContractorManagementTab";
+import ContractorApplicationsTab from "@/components/admin/ContractorApplicationsTab";
 import type { Database } from "@/integrations/supabase/types";
 
 type Address = Database["public"]["Tables"]["addresses"]["Row"];
@@ -376,6 +377,10 @@ const Admin = () => {
               <Settings className="w-4 h-4" />
               Pricing
             </TabsTrigger>
+            <TabsTrigger value="applications" className="flex items-center gap-2">
+              <ClipboardList className="w-4 h-4" />
+              Applications
+            </TabsTrigger>
             <TabsTrigger value="contractors" className="flex items-center gap-2">
               <Users className="w-4 h-4" />
               Contractors
@@ -499,6 +504,10 @@ const Admin = () => {
                 <PricingSettingsTab />
               </CardContent>
             </Card>
+          </TabsContent>
+
+          <TabsContent value="applications">
+            <ContractorApplicationsTab />
           </TabsContent>
 
           <TabsContent value="contractors">
