@@ -48,11 +48,9 @@ export const BusinessDetailsStep = ({ data, onChange, userId, onNext }: Business
 
       if (uploadError) throw uploadError;
 
-      const { data: urlData } = supabase.storage
-        .from("contractor-documents")
-        .getPublicUrl(fileName);
-
-      onChange({ ...data, insuranceCertificateUrl: urlData.publicUrl });
+      // Store the file path, not a public URL
+      // Signed URLs will be generated on-demand when viewing the document
+      onChange({ ...data, insuranceCertificateUrl: fileName });
       toast.success("Certificate uploaded successfully");
     } catch (error) {
       console.error("Upload error:", error);
