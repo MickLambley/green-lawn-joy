@@ -3,20 +3,21 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { ArrowRight, Building, Upload, FileCheck, Loader2 } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { ArrowRight, User, Upload, FileCheck, Loader2, AlertCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import type { BusinessData } from "@/pages/ContractorOnboarding";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import type { IdentityBusinessData } from "@/pages/ContractorOnboarding";
 
-interface BusinessDetailsStepProps {
-  data: BusinessData;
-  onChange: (data: BusinessData) => void;
+interface IdentityBusinessStepProps {
+  data: IdentityBusinessData;
+  onChange: (data: IdentityBusinessData) => void;
   userId: string;
   onNext: () => void;
-  onBack: () => void;
 }
 
-export const BusinessDetailsStep = ({ data, onChange, userId, onNext }: BusinessDetailsStepProps) => {
+export const IdentityBusinessStep = ({ data, onChange, userId, onNext }: IdentityBusinessStepProps) => {
   const [isUploading, setIsUploading] = useState(false);
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -50,7 +51,7 @@ export const BusinessDetailsStep = ({ data, onChange, userId, onNext }: Business
 
       // Store the file path, not a public URL
       // Signed URLs will be generated on-demand when viewing the document
-      onChange({ ...data, insuranceCertificateUrl: fileName });
+      onChange({ ...data, insuranceCertificatePath: fileName });
       toast.success("Certificate uploaded successfully");
     } catch (error) {
       console.error("Upload error:", error);
@@ -61,7 +62,6 @@ export const BusinessDetailsStep = ({ data, onChange, userId, onNext }: Business
   };
 
   const validateABN = (abn: string) => {
-    // Remove spaces and check format
     const cleanABN = abn.replace(/\s/g, "");
     return /^\d{11}$/.test(cleanABN);
   };
@@ -74,42 +74,63 @@ export const BusinessDetailsStep = ({ data, onChange, userId, onNext }: Business
     return `${digits.slice(0, 2)} ${digits.slice(2, 5)} ${digits.slice(5, 8)} ${digits.slice(8)}`;
   };
 
+  const formatPhoneNumber = (value: string) => {
+    const digits = value.replace(/\D/g, "").slice(0, 10);
+    if (digits.length <= 4) return digits;
+    if (digits.length <= 7) return `${digits.slice(0, 4)} ${digits.slice(4)}`;
+    return `${digits.slice(0, 4)} ${digits.slice(4, 7)} ${digits.slice(7)}`;
+  };
+
   const isValid = 
-    data.businessName.trim().length >= 2 &&
+    data.fullName.trim().length >= 2 &&
+    data.mobileNumber.replace(/\s/g, "").length >= 10 &&
     validateABN(data.abn) &&
-    data.businessAddress.trim().length >= 5 &&
-    data.phone.trim().length >= 8;
+    data.confirmIndependentBusiness &&
+    data.insuranceCertificatePath !== null &&
+    data.confirmInsuranceCoverage;
 
   return (
     <Card>
       <CardHeader>
         <div className="flex items-center gap-3">
           <div className="p-2 rounded-lg bg-primary/10">
-            <Building className="w-5 h-5 text-primary" />
+            <User className="w-5 h-5 text-primary" />
           </div>
           <div>
-            <CardTitle>Business Details</CardTitle>
+            <CardTitle>Identity & Business Details</CardTitle>
             <CardDescription>
-              Provide your business information and documentation
+              Required information to sign up as a contractor
             </CardDescription>
           </div>
         </div>
       </CardHeader>
       <CardContent className="space-y-6">
-        {/* Business Name */}
+        {/* Full Name */}
         <div className="space-y-2">
-          <Label htmlFor="businessName">Business Name *</Label>
+          <Label htmlFor="fullName">What is your full name? *</Label>
           <Input
-            id="businessName"
-            placeholder="e.g., John's Lawn Care Services"
-            value={data.businessName}
-            onChange={(e) => onChange({ ...data, businessName: e.target.value })}
+            id="fullName"
+            placeholder="John Smith"
+            value={data.fullName}
+            onChange={(e) => onChange({ ...data, fullName: e.target.value })}
+          />
+        </div>
+
+        {/* Mobile Number */}
+        <div className="space-y-2">
+          <Label htmlFor="mobileNumber">What is your mobile number? *</Label>
+          <Input
+            id="mobileNumber"
+            type="tel"
+            placeholder="0400 000 000"
+            value={data.mobileNumber}
+            onChange={(e) => onChange({ ...data, mobileNumber: formatPhoneNumber(e.target.value) })}
           />
         </div>
 
         {/* ABN */}
         <div className="space-y-2">
-          <Label htmlFor="abn">Australian Business Number (ABN) *</Label>
+          <Label htmlFor="abn">What is your ABN? *</Label>
           <Input
             id="abn"
             placeholder="XX XXX XXX XXX"
@@ -117,41 +138,38 @@ export const BusinessDetailsStep = ({ data, onChange, userId, onNext }: Business
             onChange={(e) => onChange({ ...data, abn: formatABN(e.target.value) })}
           />
           <p className="text-xs text-muted-foreground">
-            Your 11-digit ABN is required to work as a contractor
+            Your 11-digit Australian Business Number
           </p>
         </div>
 
-        {/* Business Address */}
-        <div className="space-y-2">
-          <Label htmlFor="businessAddress">Business Address *</Label>
-          <Input
-            id="businessAddress"
-            placeholder="Street address, suburb, state, postcode"
-            value={data.businessAddress}
-            onChange={(e) => onChange({ ...data, businessAddress: e.target.value })}
+        {/* Independent Business Confirmation */}
+        <div className="flex items-start space-x-3 p-4 bg-muted/50 rounded-lg">
+          <Checkbox
+            id="confirmIndependent"
+            checked={data.confirmIndependentBusiness}
+            onCheckedChange={(checked) => 
+              onChange({ ...data, confirmIndependentBusiness: checked === true })
+            }
           />
+          <label
+            htmlFor="confirmIndependent"
+            className="text-sm leading-relaxed cursor-pointer"
+          >
+            I confirm I operate an independent lawn care business, use my own equipment, and am responsible for how I complete my work.
+          </label>
         </div>
 
-        {/* Phone */}
-        <div className="space-y-2">
-          <Label htmlFor="phone">Contact Phone *</Label>
-          <Input
-            id="phone"
-            type="tel"
-            placeholder="04XX XXX XXX"
-            value={data.phone}
-            onChange={(e) => onChange({ ...data, phone: e.target.value })}
-          />
-        </div>
-
-        {/* Insurance Certificate */}
+        {/* Insurance Certificate Upload */}
         <div className="space-y-3">
-          <Label>Public Liability Insurance Certificate (Optional)</Label>
-          <p className="text-sm text-muted-foreground">
-            Upload your certificate of currency. This can be added later if you don't have it now.
-          </p>
+          <Label>Upload your Certificate of Currency for Public Liability Insurance *</Label>
+          <Alert className="bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800">
+            <AlertCircle className="h-4 w-4 text-amber-600" />
+            <AlertDescription className="text-amber-800 dark:text-amber-200">
+              Minimum $5 million cover required
+            </AlertDescription>
+          </Alert>
           
-          {data.insuranceCertificateUrl ? (
+          {data.insuranceCertificatePath ? (
             <div className="flex items-center gap-3 p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
               <FileCheck className="w-5 h-5 text-green-600" />
               <div className="flex-1">
@@ -162,7 +180,7 @@ export const BusinessDetailsStep = ({ data, onChange, userId, onNext }: Business
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => onChange({ ...data, insuranceCertificateUrl: null })}
+                onClick={() => onChange({ ...data, insuranceCertificatePath: null, confirmInsuranceCoverage: false })}
               >
                 Remove
               </Button>
@@ -195,6 +213,25 @@ export const BusinessDetailsStep = ({ data, onChange, userId, onNext }: Business
             </div>
           )}
         </div>
+
+        {/* Insurance Coverage Confirmation */}
+        {data.insuranceCertificatePath && (
+          <div className="flex items-start space-x-3 p-4 bg-muted/50 rounded-lg">
+            <Checkbox
+              id="confirmInsurance"
+              checked={data.confirmInsuranceCoverage}
+              onCheckedChange={(checked) => 
+                onChange({ ...data, confirmInsuranceCoverage: checked === true })
+              }
+            />
+            <label
+              htmlFor="confirmInsurance"
+              className="text-sm leading-relaxed cursor-pointer"
+            >
+              I confirm this insurance policy covers lawn care / gardening services.
+            </label>
+          </div>
+        )}
 
         {/* Next Button */}
         <div className="flex justify-end pt-4">

@@ -6,34 +6,44 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Leaf, ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
-import { QuestionnaireStep } from "@/components/contractor-onboarding/QuestionnaireStep";
-import { BusinessDetailsStep } from "@/components/contractor-onboarding/BusinessDetailsStep";
-import { ServiceAreaStep } from "@/components/contractor-onboarding/ServiceAreaStep";
+import { IdentityBusinessStep } from "@/components/contractor-onboarding/IdentityBusinessStep";
+import { ServicesEquipmentStep } from "@/components/contractor-onboarding/ServicesEquipmentStep";
+import { OperationalRulesStep } from "@/components/contractor-onboarding/OperationalRulesStep";
+import { GeographicReachStep } from "@/components/contractor-onboarding/GeographicReachStep";
+import { ExperienceStep } from "@/components/contractor-onboarding/ExperienceStep";
 import { ReviewStep } from "@/components/contractor-onboarding/ReviewStep";
 
-export interface QuestionnaireData {
-  yearsExperience: string;
-  hasOwnTransport: string;
-  transportType: string;
-  hasOwnEquipment: string;
-  equipmentTypes: string[];
-  availability: string[];
-  additionalInfo: string;
-}
-
-export interface BusinessData {
-  businessName: string;
+export interface IdentityBusinessData {
+  fullName: string;
+  mobileNumber: string;
   abn: string;
-  businessAddress: string;
-  phone: string;
-  insuranceCertificateUrl: string | null;
+  confirmIndependentBusiness: boolean;
+  insuranceCertificatePath: string | null;
+  confirmInsuranceCoverage: boolean;
 }
 
-export interface ServiceAreaData {
-  centerLat: number;
-  centerLng: number;
-  radiusKm: number;
-  selectedSuburbs: string[];
+export interface ServicesEquipmentData {
+  mowerTypes: string[];
+  offersGreenWasteRemoval: boolean | null;
+}
+
+export interface OperationalRulesData {
+  agreePhotoUpload: boolean;
+  agreeSafeWorksite: boolean;
+  agreeCancellationPolicy: boolean;
+  agreePromptCommunication: boolean;
+  agreeProfessionalStandard: boolean;
+  agreeEscrowPayment: boolean;
+  agreeDisputeProcess: boolean;
+}
+
+export interface GeographicData {
+  maxTravelDistanceKm: number;
+}
+
+export interface ExperienceData {
+  yearsExperience: string;
+  portfolioPhotoPaths: string[];
 }
 
 const ContractorOnboarding = () => {
@@ -42,32 +52,40 @@ const ContractorOnboarding = () => {
   const [currentStep, setCurrentStep] = useState(1);
   const [isLoading, setIsLoading] = useState(true);
   
-  const [questionnaireData, setQuestionnaireData] = useState<QuestionnaireData>({
-    yearsExperience: "",
-    hasOwnTransport: "",
-    transportType: "",
-    hasOwnEquipment: "",
-    equipmentTypes: [],
-    availability: [],
-    additionalInfo: "",
-  });
-
-  const [businessData, setBusinessData] = useState<BusinessData>({
-    businessName: "",
+  const [identityData, setIdentityData] = useState<IdentityBusinessData>({
+    fullName: "",
+    mobileNumber: "",
     abn: "",
-    businessAddress: "",
-    phone: "",
-    insuranceCertificateUrl: null,
+    confirmIndependentBusiness: false,
+    insuranceCertificatePath: null,
+    confirmInsuranceCoverage: false,
   });
 
-  const [serviceAreaData, setServiceAreaData] = useState<ServiceAreaData>({
-    centerLat: -33.8688,
-    centerLng: 151.2093,
-    radiusKm: 15,
-    selectedSuburbs: [],
+  const [servicesData, setServicesData] = useState<ServicesEquipmentData>({
+    mowerTypes: [],
+    offersGreenWasteRemoval: null,
   });
 
-  const totalSteps = 4;
+  const [operationalRules, setOperationalRules] = useState<OperationalRulesData>({
+    agreePhotoUpload: false,
+    agreeSafeWorksite: false,
+    agreeCancellationPolicy: false,
+    agreePromptCommunication: false,
+    agreeProfessionalStandard: false,
+    agreeEscrowPayment: false,
+    agreeDisputeProcess: false,
+  });
+
+  const [geographicData, setGeographicData] = useState<GeographicData>({
+    maxTravelDistanceKm: 15,
+  });
+
+  const [experienceData, setExperienceData] = useState<ExperienceData>({
+    yearsExperience: "",
+    portfolioPhotoPaths: [],
+  });
+
+  const totalSteps = 6;
   const progress = (currentStep / totalSteps) * 100;
 
   useEffect(() => {
@@ -84,7 +102,13 @@ const ContractorOnboarding = () => {
 
     setUser(user);
 
-    // Check if contractor profile exists
+    // Pre-fill name from user metadata
+    const fullName = user.user_metadata?.full_name || "";
+    if (fullName) {
+      setIdentityData(prev => ({ ...prev, fullName }));
+    }
+
+    // Check if contractor profile exists and is complete
     const { data: contractor } = await supabase
       .from("contractors")
       .select("*")
@@ -131,26 +155,49 @@ const ContractorOnboarding = () => {
     setIsLoading(true);
 
     try {
+      // Build questionnaire responses object
+      const questionnaireResponses = {
+        identity: {
+          fullName: identityData.fullName,
+          mobileNumber: identityData.mobileNumber,
+          confirmIndependentBusiness: identityData.confirmIndependentBusiness,
+          confirmInsuranceCoverage: identityData.confirmInsuranceCoverage,
+        },
+        services: {
+          mowerTypes: servicesData.mowerTypes,
+          offersGreenWasteRemoval: servicesData.offersGreenWasteRemoval,
+        },
+        operationalRules: operationalRules,
+        experience: {
+          yearsExperience: experienceData.yearsExperience,
+          portfolioPhotoPaths: experienceData.portfolioPhotoPaths,
+        },
+      };
+
       // Update contractor profile
       const { error } = await supabase
         .from("contractors")
         .update({
-          business_name: businessData.businessName,
-          abn: businessData.abn,
-          business_address: businessData.businessAddress,
-          phone: businessData.phone,
-          insurance_certificate_url: businessData.insuranceCertificateUrl,
-          questionnaire_responses: JSON.parse(JSON.stringify(questionnaireData)),
-          service_center_lat: serviceAreaData.centerLat,
-          service_center_lng: serviceAreaData.centerLng,
-          service_radius_km: serviceAreaData.radiusKm,
-          service_areas: serviceAreaData.selectedSuburbs,
+          abn: identityData.abn.replace(/\s/g, ""),
+          phone: identityData.mobileNumber,
+          insurance_certificate_url: identityData.insuranceCertificatePath,
+          questionnaire_responses: JSON.parse(JSON.stringify(questionnaireResponses)),
+          service_radius_km: geographicData.maxTravelDistanceKm,
           approval_status: "pending",
           applied_at: new Date().toISOString(),
         })
         .eq("user_id", user.id);
 
       if (error) throw error;
+
+      // Update profile with full name
+      await supabase
+        .from("profiles")
+        .update({
+          full_name: identityData.fullName,
+          phone: identityData.mobileNumber,
+        })
+        .eq("user_id", user.id);
 
       toast.success("Application submitted! We'll review your profile and get back to you soon.");
       navigate("/contractor");
@@ -175,6 +222,15 @@ const ContractorOnboarding = () => {
     );
   }
 
+  const stepTitles = [
+    "Identity & Business",
+    "Services & Equipment",
+    "Operational Rules",
+    "Geographic Reach",
+    "Experience (Optional)",
+    "Review & Submit"
+  ];
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -186,7 +242,7 @@ const ContractorOnboarding = () => {
             </div>
             <div>
               <span className="text-xl font-display font-bold text-foreground">Lawnly</span>
-              <span className="ml-2 text-sm text-muted-foreground">Contractor Setup</span>
+              <span className="ml-2 text-sm text-muted-foreground">Contractor Application</span>
             </div>
           </Link>
           <Button variant="ghost" size="sm" onClick={handleSignOut}>
@@ -200,7 +256,7 @@ const ContractorOnboarding = () => {
         <div className="mb-8">
           <div className="flex items-center justify-between mb-2">
             <span className="text-sm font-medium text-muted-foreground">
-              Step {currentStep} of {totalSteps}
+              Step {currentStep} of {totalSteps}: {stepTitles[currentStep - 1]}
             </span>
             <span className="text-sm font-medium text-muted-foreground">
               {Math.round(progress)}% complete
@@ -211,45 +267,66 @@ const ContractorOnboarding = () => {
 
         {/* Step Content */}
         {currentStep === 1 && (
-          <QuestionnaireStep
-            data={questionnaireData}
-            onChange={setQuestionnaireData}
+          <IdentityBusinessStep
+            data={identityData}
+            onChange={setIdentityData}
+            userId={user?.id || ""}
             onNext={() => setCurrentStep(2)}
           />
         )}
 
         {currentStep === 2 && (
-          <BusinessDetailsStep
-            data={businessData}
-            onChange={setBusinessData}
-            userId={user?.id || ""}
+          <ServicesEquipmentStep
+            data={servicesData}
+            onChange={setServicesData}
             onNext={() => setCurrentStep(3)}
             onBack={() => setCurrentStep(1)}
           />
         )}
 
         {currentStep === 3 && (
-          <ServiceAreaStep
-            data={serviceAreaData}
-            onChange={setServiceAreaData}
+          <OperationalRulesStep
+            data={operationalRules}
+            onChange={setOperationalRules}
             onNext={() => setCurrentStep(4)}
             onBack={() => setCurrentStep(2)}
           />
         )}
 
         {currentStep === 4 && (
-          <ReviewStep
-            questionnaireData={questionnaireData}
-            businessData={businessData}
-            serviceAreaData={serviceAreaData}
-            onSubmit={handleSubmit}
+          <GeographicReachStep
+            data={geographicData}
+            onChange={setGeographicData}
+            onNext={() => setCurrentStep(5)}
             onBack={() => setCurrentStep(3)}
+          />
+        )}
+
+        {currentStep === 5 && (
+          <ExperienceStep
+            data={experienceData}
+            onChange={setExperienceData}
+            userId={user?.id || ""}
+            onNext={() => setCurrentStep(6)}
+            onBack={() => setCurrentStep(4)}
+          />
+        )}
+
+        {currentStep === 6 && (
+          <ReviewStep
+            identityData={identityData}
+            servicesData={servicesData}
+            operationalRules={operationalRules}
+            geographicData={geographicData}
+            experienceData={experienceData}
+            onSubmit={handleSubmit}
+            onBack={() => setCurrentStep(5)}
             isLoading={isLoading}
           />
         )}
 
-        {/* Back to previous step */}
-        {currentStep > 1 && currentStep < 4 && (
+        {/* Back button for middle steps */}
+        {currentStep > 1 && currentStep < 6 && (
           <div className="mt-6">
             <Button
               variant="ghost"
