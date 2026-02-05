@@ -35,7 +35,7 @@ import { Switch } from "@/components/ui/switch";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
-  Eye, Check, X, FileText, Clock, MapPin, Wrench, Loader2, 
+  Eye, Check, X, FileText, Clock, MapPin, Wrench, Loader2, User,
   Edit, Trash2, Ban, UserCheck, Users 
 } from "lucide-react";
 import { toast } from "sonner";
@@ -50,23 +50,42 @@ interface ContractorWithProfile extends Contractor {
 
 interface QuestionnaireResponses {
   identity?: {
+    businessName?: string;
     fullName?: string;
     mobileNumber?: string;
-    abn?: string;
-    independentBusinessConfirmed?: boolean;
-    insuranceCoversLawnCare?: boolean;
-    insuranceCertificatePath?: string;
+    confirmIndependentBusiness?: boolean;
+    confirmInsuranceCoverage?: boolean;
+    businessAddress?: string;
+    mailingAddress?: string;
   };
   services?: {
     mowerTypes?: string[];
     offersGreenWasteRemoval?: boolean;
   };
-  operationalRules?: string[];
+  operationalRules?: {
+    agreePhotoUpload?: boolean;
+    agreeSafeWorksite?: boolean;
+    agreeCancellationPolicy?: boolean;
+    agreePromptCommunication?: boolean;
+    agreeProfessionalStandard?: boolean;
+    agreeEscrowPayment?: boolean;
+    agreeDisputeProcess?: boolean;
+  };
   experience?: {
-    yearsOfExperience?: string;
+    yearsExperience?: string;
     portfolioPhotoPaths?: string[];
   };
 }
+
+const operationalRuleLabels: Record<string, string> = {
+  agreePhotoUpload: "Upload before/after photos for each job",
+  agreeSafeWorksite: "Maintain a safe worksite",
+  agreeCancellationPolicy: "Follow cancellation policy (24hr notice)",
+  agreePromptCommunication: "Respond to customer messages within 4 hours",
+  agreeProfessionalStandard: "Maintain professional standards",
+  agreeEscrowPayment: "Accept escrow-style payment (released after job completion)",
+  agreeDisputeProcess: "Follow dispute resolution process",
+};
 
 const ContractorApplicationsTab = () => {
   const [contractors, setContractors] = useState<ContractorWithProfile[]>([]);
@@ -589,6 +608,10 @@ const ContractorApplicationsTab = () => {
                     <Label className="text-muted-foreground">Phone</Label>
                     <p className="font-medium">{selectedContractor.phone || selectedContractor.profilePhone || "-"}</p>
                   </div>
+                  <div className="col-span-2">
+                    <Label className="text-muted-foreground">Business Address</Label>
+                    <p className="font-medium">{selectedContractor.business_address || "-"}</p>
+                  </div>
                   <div>
                     <Label className="text-muted-foreground">Applied Date</Label>
                     <p className="font-medium">
@@ -604,6 +627,23 @@ const ContractorApplicationsTab = () => {
                     </div>
                   </div>
                 </div>
+
+                {/* Service Areas */}
+                {selectedContractor.service_areas && selectedContractor.service_areas.length > 0 && (
+                  <div className="space-y-2">
+                    <Label className="flex items-center gap-2">
+                      <MapPin className="w-4 h-4" />
+                      Serviced Suburbs ({selectedContractor.service_areas.length})
+                    </Label>
+                    <div className="flex flex-wrap gap-1">
+                      {selectedContractor.service_areas.map((suburb, index) => (
+                        <Badge key={index} variant="outline" className="text-xs">
+                          {suburb}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 {/* Insurance Certificate */}
                 <div className="space-y-2">
@@ -642,12 +682,71 @@ const ContractorApplicationsTab = () => {
                 {/* Questionnaire Responses */}
                 {selectedContractor.questionnaire_responses && (
                   <div className="space-y-4">
+                    <Label className="text-base font-semibold">Application Questionnaire</Label>
                     {(() => {
                       const responses = parseQuestionnaire(selectedContractor.questionnaire_responses);
                       if (!responses) return null;
 
                       return (
                         <>
+                          {/* Identity Details */}
+                          {responses.identity && (
+                            <div className="space-y-2">
+                              <Label className="flex items-center gap-2">
+                                <User className="w-4 h-4" />
+                                Identity & Business Details
+                              </Label>
+                              <div className="bg-muted/50 rounded-lg p-3 space-y-2">
+                                {responses.identity.businessName && (
+                                  <div>
+                                    <span className="text-sm text-muted-foreground">Business Name: </span>
+                                    <span className="font-medium">{responses.identity.businessName}</span>
+                                  </div>
+                                )}
+                                {responses.identity.fullName && (
+                                  <div>
+                                    <span className="text-sm text-muted-foreground">Full Name: </span>
+                                    <span className="font-medium">{responses.identity.fullName}</span>
+                                  </div>
+                                )}
+                                {responses.identity.mobileNumber && (
+                                  <div>
+                                    <span className="text-sm text-muted-foreground">Mobile: </span>
+                                    <span className="font-medium">{responses.identity.mobileNumber}</span>
+                                  </div>
+                                )}
+                                {responses.identity.businessAddress && (
+                                  <div>
+                                    <span className="text-sm text-muted-foreground">Business Address: </span>
+                                    <span className="font-medium">{responses.identity.businessAddress}</span>
+                                  </div>
+                                )}
+                                {responses.identity.mailingAddress && responses.identity.mailingAddress !== responses.identity.businessAddress && (
+                                  <div>
+                                    <span className="text-sm text-muted-foreground">Mailing Address: </span>
+                                    <span className="font-medium">{responses.identity.mailingAddress}</span>
+                                  </div>
+                                )}
+                                <div className="flex items-center gap-2 mt-2">
+                                  {responses.identity.confirmIndependentBusiness ? (
+                                    <Check className="w-4 h-4 text-primary" />
+                                  ) : (
+                                    <X className="w-4 h-4 text-destructive" />
+                                  )}
+                                  <span className="text-sm">Confirmed independent business operator</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  {responses.identity.confirmInsuranceCoverage ? (
+                                    <Check className="w-4 h-4 text-primary" />
+                                  ) : (
+                                    <X className="w-4 h-4 text-destructive" />
+                                  )}
+                                  <span className="text-sm">Insurance covers lawn care services</span>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+
                           {responses.services && (
                             <div className="space-y-2">
                               <Label className="flex items-center gap-2">
@@ -662,9 +761,9 @@ const ContractorApplicationsTab = () => {
                                   </span>
                                 </div>
                                 <div>
-                                  <span className="text-sm text-muted-foreground">Green Waste Removal: </span>
+                                  <span className="text-sm text-muted-foreground">Offers Green Waste Removal: </span>
                                   <span className="font-medium">
-                                    {responses.services.offersGreenWasteRemoval ? "Yes" : "No"}
+                                    {responses.services.offersGreenWasteRemoval === true ? "Yes" : responses.services.offersGreenWasteRemoval === false ? "No" : "Not specified"}
                                   </span>
                                 </div>
                               </div>
@@ -673,25 +772,42 @@ const ContractorApplicationsTab = () => {
 
                           {responses.experience && (
                             <div className="space-y-2">
-                              <Label>Experience</Label>
+                              <Label className="flex items-center gap-2">
+                                <Clock className="w-4 h-4" />
+                                Experience
+                              </Label>
                               <div className="bg-muted/50 rounded-lg p-3">
                                 <span className="text-sm text-muted-foreground">Years of Experience: </span>
                                 <span className="font-medium">
-                                  {responses.experience.yearsOfExperience || "Not specified"}
+                                  {responses.experience.yearsExperience || "Not specified"}
                                 </span>
+                                {responses.experience.portfolioPhotoPaths && responses.experience.portfolioPhotoPaths.length > 0 && (
+                                  <div className="mt-2">
+                                    <span className="text-sm text-muted-foreground">
+                                      Portfolio: {responses.experience.portfolioPhotoPaths.length} photo(s) uploaded
+                                    </span>
+                                  </div>
+                                )}
                               </div>
                             </div>
                           )}
 
-                          {responses.operationalRules && responses.operationalRules.length > 0 && (
+                          {responses.operationalRules && (
                             <div className="space-y-2">
-                              <Label>Agreed to Operational Rules</Label>
+                              <Label className="flex items-center gap-2">
+                                <Check className="w-4 h-4" />
+                                Operational Rules Agreement
+                              </Label>
                               <div className="bg-muted/50 rounded-lg p-3">
                                 <ul className="text-sm space-y-1">
-                                  {responses.operationalRules.map((rule, index) => (
-                                    <li key={index} className="flex items-start gap-2">
-                                      <Check className="w-4 h-4 text-primary mt-0.5 shrink-0" />
-                                      <span>{rule}</span>
+                                  {Object.entries(responses.operationalRules).map(([key, value]) => (
+                                    <li key={key} className="flex items-start gap-2">
+                                      {value ? (
+                                        <Check className="w-4 h-4 text-primary mt-0.5 shrink-0" />
+                                      ) : (
+                                        <X className="w-4 h-4 text-destructive mt-0.5 shrink-0" />
+                                      )}
+                                      <span>{operationalRuleLabels[key] || key}</span>
                                     </li>
                                   ))}
                                 </ul>

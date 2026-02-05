@@ -1,10 +1,10 @@
-import { useState } from "react";
+ import { useState, useEffect, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { ArrowRight, User, Upload, FileCheck, Loader2, AlertCircle } from "lucide-react";
+ import { ArrowRight, User, Upload, FileCheck, Loader2, AlertCircle, Building, MapPin, Navigation } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -19,6 +19,76 @@ interface IdentityBusinessStepProps {
 
 export const IdentityBusinessStep = ({ data, onChange, userId, onNext }: IdentityBusinessStepProps) => {
   const [isUploading, setIsUploading] = useState(false);
+  const [mapLoaded, setMapLoaded] = useState(false);
+  const businessAddressInputRef = useRef<HTMLInputElement>(null);
+  const mailingAddressInputRef = useRef<HTMLInputElement>(null);
+  const businessAutocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
+  const mailingAutocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
+
+  // Load Google Maps script
+  useEffect(() => {
+    const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+    if (!apiKey) {
+      console.error("Google Maps API key not found");
+      return;
+    }
+
+    if (window.google?.maps?.places) {
+      setMapLoaded(true);
+      return;
+    }
+
+    const script = document.createElement("script");
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places`;
+    script.async = true;
+    script.defer = true;
+    script.onload = () => setMapLoaded(true);
+    document.head.appendChild(script);
+  }, []);
+
+  // Initialize business address autocomplete
+  useEffect(() => {
+    if (!mapLoaded || !businessAddressInputRef.current || businessAutocompleteRef.current) return;
+
+    businessAutocompleteRef.current = new google.maps.places.Autocomplete(businessAddressInputRef.current, {
+      componentRestrictions: { country: "au" },
+      types: ["address"],
+    });
+
+    businessAutocompleteRef.current.addListener("place_changed", () => {
+      const place = businessAutocompleteRef.current?.getPlace();
+      if (place?.geometry?.location) {
+        const lat = place.geometry.location.lat();
+        const lng = place.geometry.location.lng();
+        const address = place.formatted_address || "";
+
+        onChange({
+          ...data,
+          businessAddress: address,
+          businessAddressLat: lat,
+          businessAddressLng: lng,
+        });
+      }
+    });
+  }, [mapLoaded, data, onChange]);
+
+  // Initialize mailing address autocomplete
+  useEffect(() => {
+    if (!mapLoaded || !mailingAddressInputRef.current || mailingAutocompleteRef.current) return;
+
+    mailingAutocompleteRef.current = new google.maps.places.Autocomplete(mailingAddressInputRef.current, {
+      componentRestrictions: { country: "au" },
+      types: ["address"],
+    });
+
+    mailingAutocompleteRef.current.addListener("place_changed", () => {
+      const place = mailingAutocompleteRef.current?.getPlace();
+      if (place?.geometry?.location) {
+        const address = place.formatted_address || "";
+        onChange({ ...data, mailingAddress: address });
+      }
+    });
+  }, [mapLoaded, data, onChange]);
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -82,9 +152,12 @@ export const IdentityBusinessStep = ({ data, onChange, userId, onNext }: Identit
   };
 
   const isValid = 
+    data.businessName.trim().length >= 2 &&
     data.fullName.trim().length >= 2 &&
     data.mobileNumber.replace(/\s/g, "").length >= 10 &&
     validateABN(data.abn) &&
+    data.businessAddress.trim().length > 0 &&
+    (data.mailingAddressSameAsBusiness || data.mailingAddress.trim().length > 0) &&
     data.confirmIndependentBusiness &&
     data.insuranceCertificatePath !== null &&
     data.confirmInsuranceCoverage;
@@ -94,7 +167,7 @@ export const IdentityBusinessStep = ({ data, onChange, userId, onNext }: Identit
       <CardHeader>
         <div className="flex items-center gap-3">
           <div className="p-2 rounded-lg bg-primary/10">
-            <User className="w-5 h-5 text-primary" />
+            <Building className="w-5 h-5 text-primary" />
           </div>
           <div>
             <CardTitle>Identity & Business Details</CardTitle>
@@ -105,9 +178,20 @@ export const IdentityBusinessStep = ({ data, onChange, userId, onNext }: Identit
         </div>
       </CardHeader>
       <CardContent className="space-y-6">
+        {/* Business Name */}
+        <div className="space-y-2">
+          <Label htmlFor="businessName">What is your business name? *</Label>
+          <Input
+            id="businessName"
+            placeholder="e.g., Green Thumb Lawn Care"
+            value={data.businessName}
+            onChange={(e) => onChange({ ...data, businessName: e.target.value })}
+          />
+        </div>
+
         {/* Full Name */}
         <div className="space-y-2">
-          <Label htmlFor="fullName">What is your full name? *</Label>
+          <Label htmlFor="fullName">What is your full legal name? *</Label>
           <Input
             id="fullName"
             placeholder="John Smith"
@@ -126,6 +210,71 @@ export const IdentityBusinessStep = ({ data, onChange, userId, onNext }: Identit
             value={data.mobileNumber}
             onChange={(e) => onChange({ ...data, mobileNumber: formatPhoneNumber(e.target.value) })}
           />
+        </div>
+
+        {/* Business Address */}
+        <div className="space-y-2">
+          <Label htmlFor="businessAddress">What is your business address? *</Label>
+          <p className="text-xs text-muted-foreground">
+            This will be used as your base location for calculating travel distances to jobs.
+          </p>
+          <div className="relative">
+            <Navigation className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input
+              ref={businessAddressInputRef}
+              id="businessAddress"
+              placeholder="Start typing your business address..."
+              defaultValue={data.businessAddress}
+              className="pl-10"
+            />
+          </div>
+          {data.businessAddress && (
+            <p className="text-sm text-green-600 flex items-center gap-1">
+              <MapPin className="w-3 h-3" />
+              {data.businessAddress}
+            </p>
+          )}
+        </div>
+
+        {/* Mailing Address */}
+        <div className="space-y-3">
+          <div className="flex items-center space-x-3">
+            <Checkbox
+              id="mailingAddressSame"
+              checked={data.mailingAddressSameAsBusiness}
+              onCheckedChange={(checked) => 
+                onChange({ ...data, mailingAddressSameAsBusiness: checked === true })
+              }
+            />
+            <label
+              htmlFor="mailingAddressSame"
+              className="text-sm leading-relaxed cursor-pointer"
+            >
+              Mailing address is the same as business address
+            </label>
+          </div>
+          
+          {!data.mailingAddressSameAsBusiness && (
+            <div className="space-y-2">
+              <Label htmlFor="mailingAddress">What is your mailing address? *</Label>
+              <div className="relative">
+                <Navigation className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input
+                  ref={mailingAddressInputRef}
+                  id="mailingAddress"
+                  placeholder="Start typing your mailing address..."
+                  defaultValue={data.mailingAddress}
+                  className="pl-10"
+                />
+              </div>
+              {data.mailingAddress && (
+                <p className="text-sm text-green-600 flex items-center gap-1">
+                  <MapPin className="w-3 h-3" />
+                  {data.mailingAddress}
+                </p>
+              )}
+            </div>
+          )}
         </div>
 
         {/* ABN */}
