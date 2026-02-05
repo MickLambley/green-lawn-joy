@@ -4,9 +4,10 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { Input } from "@/components/ui/input";
-import { ArrowRight, ArrowLeft, MapPin, Loader2, Navigation } from "lucide-react";
+import { ArrowRight, ArrowLeft, MapPin, Loader2, Navigation, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Checkbox } from "@/components/ui/checkbox";
 import type { GeographicData } from "@/pages/ContractorOnboarding";
 
 interface GeographicReachStepProps {
@@ -26,6 +27,7 @@ export const GeographicReachStep = ({ data, onChange, onNext, onBack }: Geograph
   
   const [isLoadingSuburbs, setIsLoadingSuburbs] = useState(false);
   const [mapLoaded, setMapLoaded] = useState(false);
+  const [allDiscoveredSuburbs, setAllDiscoveredSuburbs] = useState<string[]>([]);
 
   const isValid = data.maxTravelDistanceKm >= 5 && data.baseAddress && data.baseAddressLat !== null;
 
@@ -173,15 +175,8 @@ export const GeographicReachStep = ({ data, onChange, onNext, onBack }: Geograph
 
   // Update circle radius when slider changes
   useEffect(() => {
-    if (circleRef.current && googleMapRef.current) {
+    if (circleRef.current) {
       circleRef.current.setRadius(data.maxTravelDistanceKm * 1000);
-      
-      if (data.baseAddressLat && data.baseAddressLng) {
-        const bounds = circleRef.current.getBounds();
-        if (bounds) {
-          googleMapRef.current.fitBounds(bounds);
-        }
-      }
     }
   }, [data.maxTravelDistanceKm, data.baseAddressLat, data.baseAddressLng]);
 
@@ -254,6 +249,8 @@ export const GeographicReachStep = ({ data, onChange, onNext, onBack }: Geograph
       }
 
       const suburbsArray = Array.from(suburbs).sort();
+      setAllDiscoveredSuburbs(suburbsArray);
+      // All suburbs selected by default
       onChange({ ...data, servicedSuburbs: suburbsArray });
     } catch (error) {
       console.error("Error fetching suburbs:", error);
@@ -272,6 +269,23 @@ export const GeographicReachStep = ({ data, onChange, onNext, onBack }: Geograph
 
     return () => clearTimeout(timer);
   }, [data.baseAddressLat, data.baseAddressLng, data.maxTravelDistanceKm]);
+
+  const toggleSuburb = (suburb: string) => {
+    const isSelected = data.servicedSuburbs.includes(suburb);
+    if (isSelected) {
+      onChange({ ...data, servicedSuburbs: data.servicedSuburbs.filter(s => s !== suburb) });
+    } else {
+      onChange({ ...data, servicedSuburbs: [...data.servicedSuburbs, suburb].sort() });
+    }
+  };
+
+  const selectAllSuburbs = () => {
+    onChange({ ...data, servicedSuburbs: [...allDiscoveredSuburbs] });
+  };
+
+  const deselectAllSuburbs = () => {
+    onChange({ ...data, servicedSuburbs: [] });
+  };
 
   return (
     <Card>
@@ -340,41 +354,26 @@ export const GeographicReachStep = ({ data, onChange, onNext, onBack }: Geograph
           <div className="flex items-center justify-between">
             <span className="text-sm text-muted-foreground">5 km</span>
             <span className="text-2xl font-bold text-primary">{data.maxTravelDistanceKm} km</span>
-            <span className="text-sm text-muted-foreground">100 km</span>
+            <span className="text-sm text-muted-foreground">50 km</span>
           </div>
           
           <Slider
             value={[data.maxTravelDistanceKm]}
-            onValueChange={([value]) => onChange({ ...data, maxTravelDistanceKm: value })}
+            onValueChange={([value]) => {
+              onChange({ ...data, maxTravelDistanceKm: value });
+            }}
             min={5}
-            max={100}
+            max={50}
             step={5}
             className="w-full"
           />
-        </div>
-
-        {/* Quick Select Buttons */}
-        <div className="space-y-2">
-          <Label className="text-sm text-muted-foreground">Quick select:</Label>
-          <div className="flex flex-wrap gap-2">
-            {[10, 15, 25, 50, 75].map((distance) => (
-              <Button
-                key={distance}
-                variant={data.maxTravelDistanceKm === distance ? "default" : "outline"}
-                size="sm"
-                onClick={() => onChange({ ...data, maxTravelDistanceKm: distance })}
-              >
-                {distance} km
-              </Button>
-            ))}
-          </div>
         </div>
 
         {/* Serviced Suburbs */}
         {data.baseAddressLat && (
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <Label>Suburbs within your service area</Label>
+              <Label>Select suburbs to service</Label>
               {isLoadingSuburbs && (
                 <span className="text-xs text-muted-foreground flex items-center gap-1">
                   <Loader2 className="w-3 h-3 animate-spin" />
@@ -383,16 +382,53 @@ export const GeographicReachStep = ({ data, onChange, onNext, onBack }: Geograph
               )}
             </div>
             
-            {data.servicedSuburbs.length > 0 ? (
-              <ScrollArea className="h-32 rounded-lg border border-border p-3">
-                <div className="flex flex-wrap gap-2">
-                  {data.servicedSuburbs.map((suburb) => (
-                    <Badge key={suburb} variant="secondary" className="text-xs">
-                      {suburb}
-                    </Badge>
-                  ))}
+            {allDiscoveredSuburbs.length > 0 ? (
+              <>
+                <div className="flex items-center gap-2">
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={selectAllSuburbs}
+                    disabled={data.servicedSuburbs.length === allDiscoveredSuburbs.length}
+                  >
+                    Select All
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={deselectAllSuburbs}
+                    disabled={data.servicedSuburbs.length === 0}
+                  >
+                    Deselect All
+                  </Button>
+                  <span className="text-xs text-muted-foreground ml-auto">
+                    {data.servicedSuburbs.length} of {allDiscoveredSuburbs.length} selected
+                  </span>
                 </div>
-              </ScrollArea>
+                <ScrollArea className="h-48 rounded-lg border border-border p-3">
+                  <div className="space-y-2">
+                    {allDiscoveredSuburbs.map((suburb) => {
+                      const isSelected = data.servicedSuburbs.includes(suburb);
+                      return (
+                        <div 
+                          key={suburb} 
+                          className="flex items-center gap-2 cursor-pointer hover:bg-muted/50 p-1.5 rounded-md -mx-1.5"
+                          onClick={() => toggleSuburb(suburb)}
+                        >
+                          <Checkbox 
+                            checked={isSelected}
+                            onCheckedChange={() => toggleSuburb(suburb)}
+                            onClick={(e) => e.stopPropagation()}
+                          />
+                          <span className={`text-sm ${isSelected ? 'text-foreground' : 'text-muted-foreground'}`}>
+                            {suburb}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </ScrollArea>
+              </>
             ) : (
               <div className="h-20 rounded-lg border border-dashed border-border flex items-center justify-center">
                 <p className="text-sm text-muted-foreground">
@@ -402,7 +438,7 @@ export const GeographicReachStep = ({ data, onChange, onNext, onBack }: Geograph
             )}
             
             <p className="text-xs text-muted-foreground">
-              These are the approximate suburbs covered by your service area. You'll receive job notifications for addresses in these suburbs.
+              Click to deselect any suburbs you don't want to service. You'll only receive job notifications for selected suburbs.
             </p>
           </div>
         )}
