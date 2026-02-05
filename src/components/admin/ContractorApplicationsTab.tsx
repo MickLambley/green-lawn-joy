@@ -46,6 +46,7 @@ type Contractor = Database["public"]["Tables"]["contractors"]["Row"];
 interface ContractorWithProfile extends Contractor {
   profileName?: string;
   profilePhone?: string;
+  email?: string;
 }
 
 interface QuestionnaireResponses {
@@ -90,6 +91,7 @@ const operationalRuleLabels: Record<string, string> = {
 const ContractorApplicationsTab = () => {
   const [contractors, setContractors] = useState<ContractorWithProfile[]>([]);
   const [loading, setLoading] = useState(true);
+  const [emailsLoading, setEmailsLoading] = useState(false);
   const [selectedContractor, setSelectedContractor] = useState<ContractorWithProfile | null>(null);
   const [reviewDialogOpen, setReviewDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
@@ -134,9 +136,35 @@ const ContractorApplicationsTab = () => {
       }));
 
       setContractors(contractorsWithProfiles);
+      
+      // Fetch emails via edge function
+      fetchContractorEmails(contractorData.map(c => c.user_id), contractorsWithProfiles);
     }
 
     setLoading(false);
+  };
+  
+  const fetchContractorEmails = async (userIds: string[], currentContractors: ContractorWithProfile[]) => {
+    if (userIds.length === 0) return;
+    
+    setEmailsLoading(true);
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const response = await supabase.functions.invoke("admin-get-user-emails", {
+        body: { userIds },
+      });
+      
+      if (response.data?.emails) {
+        const emailMap = response.data.emails as Record<string, string>;
+        setContractors(currentContractors.map(c => ({
+          ...c,
+          email: emailMap[c.user_id] || undefined,
+        })));
+      }
+    } catch (error) {
+      console.error("Failed to fetch contractor emails:", error);
+    }
+    setEmailsLoading(false);
   };
 
   const getSignedUrl = async (filePath: string) => {
@@ -388,6 +416,7 @@ const ContractorApplicationsTab = () => {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Name</TableHead>
+                      <TableHead>Email</TableHead>
                       <TableHead>Business</TableHead>
                       <TableHead>ABN</TableHead>
                       <TableHead>Applied</TableHead>
@@ -399,6 +428,9 @@ const ContractorApplicationsTab = () => {
                       <TableRow key={contractor.id}>
                         <TableCell className="font-medium">
                           {contractor.profileName}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {contractor.email || (emailsLoading ? "..." : "-")}
                         </TableCell>
                         <TableCell>{contractor.business_name || "-"}</TableCell>
                         <TableCell>{contractor.abn || "-"}</TableCell>
@@ -445,6 +477,7 @@ const ContractorApplicationsTab = () => {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Name</TableHead>
+                      <TableHead>Email</TableHead>
                       <TableHead>Business</TableHead>
                       <TableHead>Phone</TableHead>
                       <TableHead>Service Radius</TableHead>
@@ -457,6 +490,9 @@ const ContractorApplicationsTab = () => {
                       <TableRow key={contractor.id}>
                         <TableCell className="font-medium">
                           {contractor.profileName}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {contractor.email || (emailsLoading ? "..." : "-")}
                         </TableCell>
                         <TableCell>{contractor.business_name || "-"}</TableCell>
                         <TableCell>{contractor.phone || contractor.profilePhone || "-"}</TableCell>
@@ -531,6 +567,7 @@ const ContractorApplicationsTab = () => {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Name</TableHead>
+                      <TableHead>Email</TableHead>
                       <TableHead>Business</TableHead>
                       <TableHead>Rejected Date</TableHead>
                       <TableHead>Actions</TableHead>
@@ -541,6 +578,9 @@ const ContractorApplicationsTab = () => {
                       <TableRow key={contractor.id}>
                         <TableCell className="font-medium">
                           {contractor.profileName}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {contractor.email || (emailsLoading ? "..." : "-")}
                         </TableCell>
                         <TableCell>{contractor.business_name || "-"}</TableCell>
                         <TableCell>
