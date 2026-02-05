@@ -24,12 +24,18 @@ export const GeographicReachStep = ({ data, onChange, onNext, onBack }: Geograph
   const markerRef = useRef<google.maps.Marker | null>(null);
   const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const dataRef = useRef(data);
   
   const [isLoadingSuburbs, setIsLoadingSuburbs] = useState(false);
   const [mapLoaded, setMapLoaded] = useState(false);
   const [allDiscoveredSuburbs, setAllDiscoveredSuburbs] = useState<string[]>([]);
 
   const isValid = data.maxTravelDistanceKm >= 5 && data.baseAddress && data.baseAddressLat !== null;
+
+  // Keep ref in sync with latest data
+  useEffect(() => {
+    dataRef.current = data;
+  }, [data]);
 
   // Load Google Maps script
   useEffect(() => {
@@ -181,16 +187,15 @@ export const GeographicReachStep = ({ data, onChange, onNext, onBack }: Geograph
   }, [data.maxTravelDistanceKm, data.baseAddressLat, data.baseAddressLng]);
 
   // Fetch suburbs within radius using reverse geocoding
-  const fetchSuburbsInRadius = useCallback(async () => {
-    if (!data.baseAddressLat || !data.baseAddressLng || !mapLoaded) return;
+  const fetchSuburbsInRadius = useCallback(async (lat: number, lng: number, radiusKm: number) => {
+    if (!mapLoaded) return;
 
     setIsLoadingSuburbs(true);
     
     try {
       // Generate points around the circle to find suburbs
       const suburbs = new Set<string>();
-      const center = { lat: data.baseAddressLat, lng: data.baseAddressLng };
-      const radiusKm = data.maxTravelDistanceKm;
+      const center = { lat, lng };
       
       // Sample points at different distances and angles
       const distances = [0, radiusKm * 0.25, radiusKm * 0.5, radiusKm * 0.75, radiusKm];
@@ -251,24 +256,24 @@ export const GeographicReachStep = ({ data, onChange, onNext, onBack }: Geograph
       const suburbsArray = Array.from(suburbs).sort();
       setAllDiscoveredSuburbs(suburbsArray);
       // All suburbs selected by default
-      onChange({ ...data, servicedSuburbs: suburbsArray });
+      onChange({ ...dataRef.current, servicedSuburbs: suburbsArray });
     } catch (error) {
       console.error("Error fetching suburbs:", error);
     } finally {
       setIsLoadingSuburbs(false);
     }
-  }, [data.baseAddressLat, data.baseAddressLng, data.maxTravelDistanceKm, mapLoaded, onChange, data]);
+  }, [mapLoaded, onChange]);
 
   // Debounced suburb fetch when radius or location changes
   useEffect(() => {
     if (!data.baseAddressLat || !data.baseAddressLng) return;
 
     const timer = setTimeout(() => {
-      fetchSuburbsInRadius();
+      fetchSuburbsInRadius(data.baseAddressLat!, data.baseAddressLng!, data.maxTravelDistanceKm);
     }, 500);
 
     return () => clearTimeout(timer);
-  }, [data.baseAddressLat, data.baseAddressLng, data.maxTravelDistanceKm]);
+  }, [data.baseAddressLat, data.baseAddressLng, data.maxTravelDistanceKm, fetchSuburbsInRadius]);
 
   const toggleSuburb = (suburb: string) => {
     const isSelected = data.servicedSuburbs.includes(suburb);
