@@ -35,6 +35,27 @@ import PricingSettingsTab from "@/components/admin/PricingSettingsTab";
 import ContractorApplicationsTab from "@/components/admin/ContractorApplicationsTab";
 import type { Database } from "@/integrations/supabase/types";
 
+// Badge component for pending contractors
+const PendingContractorsBadge = () => {
+  const [count, setCount] = useState<number>(0);
+  
+  useEffect(() => {
+    const fetchPendingCount = async () => {
+      const { count: pendingCount } = await supabase
+        .from("contractors")
+        .select("*", { count: "exact", head: true })
+        .eq("approval_status", "pending");
+      
+      setCount(pendingCount || 0);
+    };
+    
+    fetchPendingCount();
+  }, []);
+  
+  if (count === 0) return null;
+  return <Badge variant="secondary" className="ml-1">{count}</Badge>;
+};
+
 type Address = Database["public"]["Tables"]["addresses"]["Row"];
 type Booking = Database["public"]["Tables"]["bookings"]["Row"];
 
@@ -379,6 +400,7 @@ const Admin = () => {
             <TabsTrigger value="contractors" className="flex items-center gap-2">
               <Users className="w-4 h-4" />
               Contractors
+              <PendingContractorsBadge />
             </TabsTrigger>
           </TabsList>
 

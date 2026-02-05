@@ -14,9 +14,15 @@ import { ExperienceStep } from "@/components/contractor-onboarding/ExperienceSte
 import { ReviewStep } from "@/components/contractor-onboarding/ReviewStep";
 
 export interface IdentityBusinessData {
+  businessName: string;
   fullName: string;
   mobileNumber: string;
   abn: string;
+  businessAddress: string;
+  businessAddressLat: number | null;
+  businessAddressLng: number | null;
+  mailingAddress: string;
+  mailingAddressSameAsBusiness: boolean;
   confirmIndependentBusiness: boolean;
   insuranceCertificatePath: string | null;
   confirmInsuranceCoverage: boolean;
@@ -57,9 +63,15 @@ const ContractorOnboarding = () => {
   const [isLoading, setIsLoading] = useState(true);
   
   const [identityData, setIdentityData] = useState<IdentityBusinessData>({
+    businessName: "",
     fullName: "",
     mobileNumber: "",
     abn: "",
+    businessAddress: "",
+    businessAddressLat: null,
+    businessAddressLng: null,
+    mailingAddress: "",
+    mailingAddressSameAsBusiness: true,
     confirmIndependentBusiness: false,
     insuranceCertificatePath: null,
     confirmInsuranceCoverage: false,
@@ -87,6 +99,18 @@ const ContractorOnboarding = () => {
     baseAddressLng: null,
     servicedSuburbs: [],
   });
+
+  // Sync business address to geographic data when identity data changes
+  useEffect(() => {
+    if (identityData.businessAddress && !geographicData.baseAddress) {
+      setGeographicData(prev => ({
+        ...prev,
+        baseAddress: identityData.businessAddress,
+        baseAddressLat: identityData.businessAddressLat,
+        baseAddressLng: identityData.businessAddressLng,
+      }));
+    }
+  }, [identityData.businessAddress, identityData.businessAddressLat, identityData.businessAddressLng]);
 
   const [experienceData, setExperienceData] = useState<ExperienceData>({
     yearsExperience: "",
@@ -174,10 +198,13 @@ const ContractorOnboarding = () => {
       // Build questionnaire responses object
       const questionnaireResponses = {
         identity: {
+          businessName: identityData.businessName,
           fullName: identityData.fullName,
           mobileNumber: identityData.mobileNumber,
           confirmIndependentBusiness: identityData.confirmIndependentBusiness,
           confirmInsuranceCoverage: identityData.confirmInsuranceCoverage,
+          businessAddress: identityData.businessAddress,
+          mailingAddress: identityData.mailingAddressSameAsBusiness ? identityData.businessAddress : identityData.mailingAddress,
         },
         services: {
           mowerTypes: servicesData.mowerTypes,
@@ -194,6 +221,7 @@ const ContractorOnboarding = () => {
       const { error } = await supabase
         .from("contractors")
         .update({
+          business_name: identityData.businessName,
           abn: identityData.abn.replace(/\s/g, ""),
           phone: identityData.mobileNumber,
           insurance_certificate_url: identityData.insuranceCertificatePath,
@@ -201,7 +229,7 @@ const ContractorOnboarding = () => {
           service_radius_km: geographicData.maxTravelDistanceKm,
           service_center_lat: geographicData.baseAddressLat,
           service_center_lng: geographicData.baseAddressLng,
-          business_address: geographicData.baseAddress,
+          business_address: identityData.businessAddress,
           service_areas: geographicData.servicedSuburbs,
           approval_status: "pending",
           applied_at: new Date().toISOString(),
@@ -317,6 +345,7 @@ const ContractorOnboarding = () => {
           <GeographicReachStep
             data={geographicData}
             onChange={setGeographicData}
+            identityData={identityData}
             onNext={() => setCurrentStep(5)}
             onBack={() => setCurrentStep(3)}
           />
