@@ -145,6 +145,18 @@ export const ReviewStep = ({
               <span className="text-muted-foreground">Maximum Travel Distance:</span>
               <span className="font-medium">{geographicData.maxTravelDistanceKm} km</span>
             </div>
+            {geographicData.baseAddress && (
+              <div className="flex justify-between mt-2">
+                <span className="text-muted-foreground">Base Address:</span>
+                <span className="font-medium text-right max-w-[60%]">{geographicData.baseAddress}</span>
+              </div>
+            )}
+            {geographicData.servicedSuburbs && geographicData.servicedSuburbs.length > 0 && (
+              <div className="flex justify-between mt-2">
+                <span className="text-muted-foreground">Serviced Suburbs:</span>
+                <span className="font-medium">{geographicData.servicedSuburbs.length} suburbs</span>
+              </div>
+            )}
           </div>
         </div>
 

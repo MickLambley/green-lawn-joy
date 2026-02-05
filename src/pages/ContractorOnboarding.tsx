@@ -39,6 +39,10 @@ export interface OperationalRulesData {
 
 export interface GeographicData {
   maxTravelDistanceKm: number;
+  baseAddress: string;
+  baseAddressLat: number | null;
+  baseAddressLng: number | null;
+  servicedSuburbs: string[];
 }
 
 export interface ExperienceData {
@@ -78,6 +82,10 @@ const ContractorOnboarding = () => {
 
   const [geographicData, setGeographicData] = useState<GeographicData>({
     maxTravelDistanceKm: 15,
+    baseAddress: "",
+    baseAddressLat: null,
+    baseAddressLng: null,
+    servicedSuburbs: [],
   });
 
   const [experienceData, setExperienceData] = useState<ExperienceData>({
@@ -191,6 +199,10 @@ const ContractorOnboarding = () => {
           insurance_certificate_url: identityData.insuranceCertificatePath,
           questionnaire_responses: JSON.parse(JSON.stringify(questionnaireResponses)),
           service_radius_km: geographicData.maxTravelDistanceKm,
+          service_center_lat: geographicData.baseAddressLat,
+          service_center_lng: geographicData.baseAddressLng,
+          business_address: geographicData.baseAddress,
+          service_areas: geographicData.servicedSuburbs,
           approval_status: "pending",
           applied_at: new Date().toISOString(),
         })
