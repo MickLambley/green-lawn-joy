@@ -130,19 +130,27 @@ const ContractorOnboarding = () => {
 
     if (!roles || roles.length === 0) {
       // Add contractor role if not present
-      await supabase.from("user_roles").insert({
+      const { error: roleError } = await supabase.from("user_roles").insert({
         user_id: user.id,
         role: "contractor",
       });
+      
+      if (roleError) {
+        console.error("Error adding contractor role:", roleError);
+      }
 
       // Create contractor profile if not present
       if (!contractor) {
-        await supabase.from("contractors").insert({
+        const { error: contractorError } = await supabase.from("contractors").insert({
           user_id: user.id,
           service_areas: [],
           is_active: false,
           approval_status: "pending",
         });
+        
+        if (contractorError) {
+          console.error("Error creating contractor profile:", contractorError);
+        }
       }
     }
 
