@@ -30,9 +30,10 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
-import { Leaf, LogOut, MapPin, Calendar, Check, X, Eye, Settings, Users } from "lucide-react";
+import { Leaf, LogOut, MapPin, Calendar, Check, X, Eye, Settings, Users, PenTool } from "lucide-react";
 import PricingSettingsTab from "@/components/admin/PricingSettingsTab";
 import ContractorApplicationsTab from "@/components/admin/ContractorApplicationsTab";
+import AdminLawnEditorDialog from "@/components/admin/AdminLawnEditorDialog";
 import type { Database } from "@/integrations/supabase/types";
 
 // Badge component for pending contractors
@@ -79,6 +80,7 @@ const Admin = () => {
   const [selectedBooking, setSelectedBooking] = useState<BookingWithDetails | null>(null);
   const [verifyDialogOpen, setVerifyDialogOpen] = useState(false);
   const [bookingDialogOpen, setBookingDialogOpen] = useState(false);
+  const [lawnEditorDialogOpen, setLawnEditorDialogOpen] = useState(false);
   
   // Verification form state - only slope, tiers, and square meters
   const [squareMeters, setSquareMeters] = useState("");
@@ -440,14 +442,27 @@ const Admin = () => {
                           <TableCell>{address.tier_count}</TableCell>
                           <TableCell>{getStatusBadge(address.status)}</TableCell>
                           <TableCell>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => openVerifyDialog(address)}
-                            >
-                              <Eye className="w-4 h-4 mr-1" />
-                              Review
-                            </Button>
+                            <div className="flex gap-2">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => openVerifyDialog(address)}
+                              >
+                                <Eye className="w-4 h-4 mr-1" />
+                                Review
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  setSelectedAddress(address);
+                                  setLawnEditorDialogOpen(true);
+                                }}
+                              >
+                                <PenTool className="w-4 h-4 mr-1" />
+                                Lawn
+                              </Button>
+                            </div>
                           </TableCell>
                         </TableRow>
                       ))}
@@ -676,6 +691,14 @@ const Admin = () => {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Lawn Editor Dialog */}
+      <AdminLawnEditorDialog
+        open={lawnEditorDialogOpen}
+        onOpenChange={setLawnEditorDialogOpen}
+        address={selectedAddress}
+        onSaved={fetchData}
+      />
     </div>
   );
 };
