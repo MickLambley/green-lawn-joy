@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { User } from "@supabase/supabase-js";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
@@ -36,6 +37,7 @@ import {
   Briefcase,
   AlertCircle,
   Clock as ClockIcon2,
+  Star,
 } from "lucide-react";
 import { toast } from "sonner";
 import type { Database } from "@/integrations/supabase/types";
@@ -451,12 +453,29 @@ const ContractorDashboard = () => {
                 </TableHeader>
                 <TableBody>
                   {availableJobs.map((job) => (
-                    <TableRow key={job.id}>
+                    <TableRow key={job.id} className={job.preferred_contractor_id === contractor?.id ? "bg-primary/5" : ""}>
                       <TableCell>
                         <div className="flex items-start gap-2">
                           <MapPin className="w-4 h-4 mt-1 text-muted-foreground" />
                           <div>
-                            <p className="font-medium">{job.address?.street_address}</p>
+                            <div className="flex items-center gap-2">
+                              <p className="font-medium">{job.address?.street_address}</p>
+                              {job.preferred_contractor_id === contractor?.id && (
+                                <TooltipProvider>
+                                  <Tooltip>
+                                    <TooltipTrigger>
+                                      <Badge variant="default" className="bg-amber-500 hover:bg-amber-600 text-xs gap-1">
+                                        <Star className="w-3 h-3 fill-current" />
+                                        Requested
+                                      </Badge>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                      <p>This customer specifically requested you!</p>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                              )}
+                            </div>
                             <p className="text-sm text-muted-foreground">
                               {job.address?.city}, {job.address?.state}
                             </p>
