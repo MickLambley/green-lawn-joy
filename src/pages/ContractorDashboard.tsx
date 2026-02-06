@@ -45,9 +45,11 @@ import type { Database } from "@/integrations/supabase/types";
 type Booking = Database["public"]["Tables"]["bookings"]["Row"];
 type Address = Database["public"]["Tables"]["addresses"]["Row"];
 type Contractor = Database["public"]["Tables"]["contractors"]["Row"];
+type Profile = Database["public"]["Tables"]["profiles"]["Row"];
 
 interface BookingWithAddress extends Booking {
   address?: Address;
+  customerProfile?: Profile;
 }
 
 const timeSlots = [
@@ -169,13 +171,22 @@ const ContractorDashboard = () => {
 
     if (myJobsData && myJobsData.length > 0) {
       const addressIds = myJobsData.map(b => b.address_id);
-      const { data: addressData } = await supabase
-        .from("addresses")
-        .select("*")
-        .in("id", addressIds);
+      const userIds = myJobsData.map(b => b.user_id);
+      
+      // Fetch addresses and customer profiles in parallel
+      const [addressResult, profileResult] = await Promise.all([
+        supabase.from("addresses").select("*").in("id", addressIds),
+        supabase.from("profiles").select("*").in("user_id", userIds)
+      ]);
 
-      const addressMap = new Map(addressData?.map(a => [a.id, a]) || []);
-      setMyJobs(myJobsData.map(b => ({ ...b, address: addressMap.get(b.address_id) })));
+      const addressMap = new Map(addressResult.data?.map(a => [a.id, a]) || []);
+      const profileMap = new Map(profileResult.data?.map(p => [p.user_id, p]) || []);
+      
+      setMyJobs(myJobsData.map(b => ({ 
+        ...b, 
+        address: addressMap.get(b.address_id),
+        customerProfile: profileMap.get(b.user_id)
+      })));
     } else {
       setMyJobs([]);
     }
@@ -553,6 +564,7 @@ const ContractorDashboard = () => {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Location</TableHead>
+                    <TableHead>Customer</TableHead>
                     <TableHead>Date & Time</TableHead>
                     <TableHead>Details</TableHead>
                     <TableHead>Status</TableHead>
@@ -571,6 +583,19 @@ const ContractorDashboard = () => {
                               {job.address?.city}, {job.address?.state}
                             </p>
                           </div>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="text-sm">
+                          <p className="font-medium">{job.customerProfile?.full_name || "Customer"}</p>
+                          {job.customerProfile?.phone && (
+                            <a 
+                              href={`tel:${job.customerProfile.phone}`} 
+                              className="text-primary hover:underline"
+                            >
+                              {job.customerProfile.phone}
+                            </a>
+                          )}
                         </div>
                       </TableCell>
                       <TableCell>
