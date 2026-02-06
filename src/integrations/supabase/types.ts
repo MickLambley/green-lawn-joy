@@ -22,6 +22,7 @@ export type Database = {
           created_at: string
           fixed_price: number | null
           id: string
+          lawn_image_url: string | null
           postal_code: string
           price_per_sqm: number | null
           slope: Database["public"]["Enums"]["slope_type"]
@@ -42,6 +43,7 @@ export type Database = {
           created_at?: string
           fixed_price?: number | null
           id?: string
+          lawn_image_url?: string | null
           postal_code: string
           price_per_sqm?: number | null
           slope?: Database["public"]["Enums"]["slope_type"]
@@ -62,6 +64,7 @@ export type Database = {
           created_at?: string
           fixed_price?: number | null
           id?: string
+          lawn_image_url?: string | null
           postal_code?: string
           price_per_sqm?: number | null
           slope?: Database["public"]["Enums"]["slope_type"]

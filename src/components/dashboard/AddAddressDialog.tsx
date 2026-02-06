@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -30,7 +30,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { MapPin, Loader2, ArrowLeft, ArrowRight } from "lucide-react";
 import AddressAutocompleteInput from "./AddressAutocompleteInput";
-import LawnDrawingMap from "./LawnDrawingMap";
+import LawnDrawingMap, { LawnDrawingMapRef } from "./LawnDrawingMap";
 
 const addressSchema = z.object({
   street_address: z
@@ -77,6 +77,7 @@ const AddAddressDialog = ({ open, onOpenChange, onSuccess }: AddAddressDialogPro
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [currentStep, setCurrentStep] = useState<Step>("address");
   const [calculatedArea, setCalculatedArea] = useState(0);
+  const lawnMapRef = useRef<LawnDrawingMapRef>(null);
 
   const form = useForm<AddressFormData>({
     resolver: zodResolver(addressSchema),
@@ -122,6 +123,41 @@ const AddAddressDialog = ({ open, onOpenChange, onSuccess }: AddAddressDialogPro
     return `${values.street_address}, ${values.city}, ${values.state} ${values.postal_code}`;
   };
 
+  const uploadLawnImage = async (userId: string): Promise<string | null> => {
+    if (!lawnMapRef.current) return null;
+
+    try {
+      const blob = await lawnMapRef.current.captureImage();
+      if (!blob) {
+        console.warn("Could not capture lawn image");
+        return null;
+      }
+
+      const fileName = `${userId}/${Date.now()}-lawn.png`;
+      const { data, error } = await supabase.storage
+        .from("lawn-images")
+        .upload(fileName, blob, {
+          contentType: "image/png",
+          upsert: false,
+        });
+
+      if (error) {
+        console.error("Error uploading lawn image:", error);
+        return null;
+      }
+
+      // Get public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from("lawn-images")
+        .getPublicUrl(data.path);
+
+      return publicUrl;
+    } catch (error) {
+      console.error("Error in uploadLawnImage:", error);
+      return null;
+    }
+  };
+
   const onSubmit = async (data: AddressFormData) => {
     setIsSubmitting(true);
     try {
@@ -131,6 +167,9 @@ const AddAddressDialog = ({ open, onOpenChange, onSuccess }: AddAddressDialogPro
         toast.error("You must be logged in to add an address.");
         return;
       }
+
+      // Capture and upload the lawn image
+      const lawnImageUrl = await uploadLawnImage(user.id);
 
       const { error } = await supabase.from("addresses").insert({
         user_id: user.id,
@@ -142,6 +181,7 @@ const AddAddressDialog = ({ open, onOpenChange, onSuccess }: AddAddressDialogPro
         slope: data.slope,
         tier_count: data.tier_count,
         square_meters: calculatedArea > 0 ? calculatedArea : null,
+        lawn_image_url: lawnImageUrl,
       });
 
       if (error) {
@@ -282,6 +322,7 @@ const AddAddressDialog = ({ open, onOpenChange, onSuccess }: AddAddressDialogPro
       </div>
 
       <LawnDrawingMap
+        ref={lawnMapRef}
         address={getFullAddress()}
         onAreaCalculated={handleAreaCalculated}
       />
