@@ -41,6 +41,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import type { Database } from "@/integrations/supabase/types";
+import JobDetailsDialog from "@/components/contractor/JobDetailsDialog";
 
 type Booking = Database["public"]["Tables"]["bookings"]["Row"];
 type Address = Database["public"]["Tables"]["addresses"]["Row"];
@@ -67,6 +68,8 @@ const ContractorDashboard = () => {
   const [myJobs, setMyJobs] = useState<BookingWithAddress[]>([]);
   const [selectedJob, setSelectedJob] = useState<BookingWithAddress | null>(null);
   const [suggestDialogOpen, setSuggestDialogOpen] = useState(false);
+  const [jobDetailsDialogOpen, setJobDetailsDialogOpen] = useState(false);
+  const [viewingJob, setViewingJob] = useState<BookingWithAddress | null>(null);
   const [suggestedDate, setSuggestedDate] = useState<Date | undefined>(undefined);
   const [suggestedTimeSlot, setSuggestedTimeSlot] = useState("10am-2pm");
 
@@ -464,7 +467,14 @@ const ContractorDashboard = () => {
                 </TableHeader>
                 <TableBody>
                   {availableJobs.map((job) => (
-                    <TableRow key={job.id} className={job.preferred_contractor_id === contractor?.id ? "bg-primary/5" : ""}>
+                    <TableRow 
+                      key={job.id} 
+                      className={`cursor-pointer hover:bg-muted/50 ${job.preferred_contractor_id === contractor?.id ? "bg-primary/5" : ""}`}
+                      onClick={() => {
+                        setViewingJob(job);
+                        setJobDetailsDialogOpen(true);
+                      }}
+                    >
                       <TableCell>
                         <div className="flex items-start gap-2">
                           <MapPin className="w-4 h-4 mt-1 text-muted-foreground" />
@@ -521,7 +531,7 @@ const ContractorDashboard = () => {
                       </TableCell>
                       <TableCell>
                         <div className="flex gap-2">
-                          <Button size="sm" onClick={() => handleAcceptJob(job)}>
+                          <Button size="sm" onClick={(e) => { e.stopPropagation(); handleAcceptJob(job); }}>
                             <Check className="w-4 h-4 mr-1" />
                             Accept
                           </Button>
@@ -573,7 +583,14 @@ const ContractorDashboard = () => {
                 </TableHeader>
                 <TableBody>
                   {myJobs.map((job) => (
-                    <TableRow key={job.id}>
+                    <TableRow 
+                      key={job.id}
+                      className="cursor-pointer hover:bg-muted/50"
+                      onClick={() => {
+                        setViewingJob(job);
+                        setJobDetailsDialogOpen(true);
+                      }}
+                    >
                       <TableCell>
                         <div className="flex items-start gap-2">
                           <MapPin className="w-4 h-4 mt-1 text-muted-foreground" />
@@ -619,7 +636,7 @@ const ContractorDashboard = () => {
                       <TableCell>{getStatusBadge(job.status)}</TableCell>
                       <TableCell>
                         {job.status === "confirmed" && (
-                          <Button size="sm" variant="outline" onClick={() => handleCompleteJob(job)}>
+                          <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); handleCompleteJob(job); }}>
                             <Check className="w-4 h-4 mr-1" />
                             Complete
                           </Button>
@@ -677,6 +694,14 @@ const ContractorDashboard = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Job Details Dialog */}
+      <JobDetailsDialog
+        open={jobDetailsDialogOpen}
+        onOpenChange={setJobDetailsDialogOpen}
+        job={viewingJob}
+        showContactInfo={viewingJob?.contractor_id === contractor?.id && viewingJob?.status !== "completed"}
+      />
     </div>
   );
 };
