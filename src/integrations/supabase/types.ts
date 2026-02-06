@@ -296,6 +296,53 @@ export type Database = {
         }
         Relationships: []
       }
+      lawn_area_revisions: {
+        Row: {
+          address_id: string
+          created_at: string
+          created_by: string
+          id: string
+          is_current: boolean
+          lawn_image_url: string | null
+          notes: string | null
+          polygon_data: Json | null
+          revision_number: number
+          square_meters: number | null
+        }
+        Insert: {
+          address_id: string
+          created_at?: string
+          created_by: string
+          id?: string
+          is_current?: boolean
+          lawn_image_url?: string | null
+          notes?: string | null
+          polygon_data?: Json | null
+          revision_number?: number
+          square_meters?: number | null
+        }
+        Update: {
+          address_id?: string
+          created_at?: string
+          created_by?: string
+          id?: string
+          is_current?: boolean
+          lawn_image_url?: string | null
+          notes?: string | null
+          polygon_data?: Json | null
+          revision_number?: number
+          square_meters?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lawn_area_revisions_address_id_fkey"
+            columns: ["address_id"]
+            isOneToOne: false
+            referencedRelation: "addresses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notifications: {
         Row: {
           booking_id: string | null
