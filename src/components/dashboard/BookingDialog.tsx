@@ -161,27 +161,35 @@ const BookingDialog = ({ open, onOpenChange, addresses, defaultAddressId, onSucc
   }, [selectedAddress, selectSpecificContractor]);
 
   const fetchPricingSettings = async () => {
-    const { data } = await supabase
-      .from("pricing_settings")
-      .select("key, value");
-
-    if (data) {
-      const settings: Record<string, number> = {};
-      data.forEach((row) => {
-        settings[row.key] = Number(row.value);
-      });
-      setPricingSettings(settings as unknown as PricingSettings);
-    }
+    // Pricing settings are now server-side only
+    // We'll calculate quotes via edge function
+    // Set a placeholder to indicate settings are "available" for UI flow
+    setPricingSettings({
+      base_price_per_sqm: 0,
+      fixed_base_price: 0,
+      grass_length_short: 1,
+      grass_length_medium: 1,
+      grass_length_long: 1,
+      grass_length_very_long: 1,
+      clipping_removal_cost: 0,
+      saturday_surcharge: 1,
+      sunday_surcharge: 1,
+      public_holiday_surcharge: 1,
+      slope_mild_multiplier: 1,
+      slope_steep_multiplier: 1,
+      tier_multiplier: 0,
+    });
   };
 
   const fetchContractorsForAddress = async () => {
     if (!selectedAddress) return;
     
-    // Fetch contractors that service this address's area
+    // Fetch only non-sensitive contractor fields for preferred contractor selection
     const { data: contractorsData } = await supabase
       .from("contractors")
       .select("id, business_name, user_id, service_areas")
-      .eq("is_active", true);
+      .eq("is_active", true)
+      .eq("approval_status", "approved");
 
     if (contractorsData) {
       // Filter contractors by service area (check if address city/state is in their service areas)
@@ -197,7 +205,7 @@ const BookingDialog = ({ open, onOpenChange, addresses, defaultAddressId, onSucc
         )
       );
 
-      // Fetch profiles for contractors
+      // Fetch profiles for contractors (only full_name for display)
       const userIds = filteredContractors.map(c => c.user_id);
       const { data: profiles } = await supabase
         .from("profiles")
@@ -218,52 +226,9 @@ const BookingDialog = ({ open, onOpenChange, addresses, defaultAddressId, onSucc
     return day === 0 || day === 6;
   };
 
-  const isSaturday = (date: Date): boolean => date.getDay() === 6;
-  const isSunday = (date: Date): boolean => date.getDay() === 0;
+  // Quote calculation is now handled server-side via edge function
 
-  const calculateQuote = (): QuoteBreakdown | null => {
-    if (!pricingSettings || !selectedDate || !selectedAddress?.square_meters) return null;
-
-    const basePrice = pricingSettings.fixed_base_price;
-    const areaPrice = Number(selectedAddress.square_meters) * pricingSettings.base_price_per_sqm;
-
-    // Slope multiplier
-    let slopeMultiplier = 1;
-    if (selectedAddress.slope === "mild") slopeMultiplier = pricingSettings.slope_mild_multiplier;
-    if (selectedAddress.slope === "steep") slopeMultiplier = pricingSettings.slope_steep_multiplier;
-
-    // Tier multiplier (additional per extra tier)
-    const tierMultiplier = 1 + (selectedAddress.tier_count - 1) * pricingSettings.tier_multiplier;
-
-    // Grass length multiplier
-    const grassLengthKey = `grass_length_${grassLength}` as keyof PricingSettings;
-    const grassLengthMultiplier = pricingSettings[grassLengthKey] || 1;
-
-    // Clippings removal cost
-    const clippingsCost = clippingsRemoval ? pricingSettings.clipping_removal_cost : 0;
-
-    // Day surcharge
-    let daySurcharge = 1;
-    if (isSaturday(selectedDate)) daySurcharge = pricingSettings.saturday_surcharge;
-    if (isSunday(selectedDate)) daySurcharge = pricingSettings.sunday_surcharge;
-
-    const subtotal = (basePrice + areaPrice) * slopeMultiplier * tierMultiplier * grassLengthMultiplier;
-    const total = (subtotal * daySurcharge) + clippingsCost;
-
-    return {
-      basePrice,
-      areaPrice,
-      slopeMultiplier,
-      tierMultiplier,
-      grassLengthMultiplier,
-      clippingsCost,
-      daySurcharge,
-      subtotal,
-      total: Math.round(total * 100) / 100,
-    };
-  };
-
-  const handleGetQuote = () => {
+  const handleGetQuote = async () => {
     if (!selectedAddressId) {
       toast.error("Please select an address");
       return;
@@ -272,10 +237,30 @@ const BookingDialog = ({ open, onOpenChange, addresses, defaultAddressId, onSucc
       toast.error("Please select a date");
       return;
     }
-    const calculatedQuote = calculateQuote();
-    if (calculatedQuote) {
-      setQuote(calculatedQuote);
+    
+    setLoading(true);
+    try {
+      // Calculate quote via edge function (pricing settings hidden from client)
+      const { data, error } = await supabase.functions.invoke("calculate-quote", {
+        body: {
+          addressId: selectedAddressId,
+          selectedDate: selectedDate.toISOString(),
+          grassLength,
+          clippingsRemoval,
+        },
+      });
+
+      if (error || !data?.quote) {
+        throw new Error(error?.message || "Failed to calculate quote");
+      }
+
+      setQuote(data.quote);
       setStep("quote");
+    } catch (error) {
+      console.error("Quote error:", error);
+      toast.error("Failed to calculate quote. Please try again.");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -634,9 +619,13 @@ const BookingDialog = ({ open, onOpenChange, addresses, defaultAddressId, onSucc
                 className="w-full" 
                 size="lg" 
                 onClick={handleGetQuote}
-                disabled={!selectedAddressId || !selectedDate}
+                disabled={!selectedAddressId || !selectedDate || loading}
               >
-                <Calculator className="w-4 h-4 mr-2" />
+                {loading ? (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                ) : (
+                  <Calculator className="w-4 h-4 mr-2" />
+                )}
                 Get Instant Quote
               </Button>
             </div>
