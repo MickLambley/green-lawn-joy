@@ -99,10 +99,10 @@ const AddAddressDialog = ({ open, onOpenChange, onSuccess }: AddAddressDialogPro
     state: string;
     postal_code: string;
   }) => {
-    form.setValue("street_address", address.street_address);
-    form.setValue("city", address.city);
-    form.setValue("state", address.state);
-    form.setValue("postal_code", address.postal_code);
+    form.setValue("street_address", address.street_address, { shouldValidate: true, shouldDirty: true });
+    form.setValue("city", address.city, { shouldValidate: true, shouldDirty: true });
+    form.setValue("state", address.state, { shouldValidate: true, shouldDirty: true });
+    form.setValue("postal_code", address.postal_code, { shouldValidate: true, shouldDirty: true });
   };
 
   const handleAreaCalculated = (areaInSqm: number) => {
