@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
@@ -15,10 +16,12 @@ import {
   X, 
   ImageOff,
   Calendar,
-  Clock
+  Clock,
+  Loader2,
 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import type { Database } from "@/integrations/supabase/types";
+import { getLawnImageSignedUrl } from "@/lib/storage";
 
 type Address = Database["public"]["Tables"]["addresses"]["Row"];
 type Booking = Database["public"]["Tables"]["bookings"]["Row"];
@@ -48,6 +51,20 @@ const JobDetailsDialog = ({
   job,
   showContactInfo = false 
 }: JobDetailsDialogProps) => {
+  const [lawnImageUrl, setLawnImageUrl] = useState<string | null>(null);
+  const [loadingImage, setLoadingImage] = useState(false);
+
+  useEffect(() => {
+    if (open && job?.address?.lawn_image_url) {
+      setLoadingImage(true);
+      getLawnImageSignedUrl(job.address.lawn_image_url)
+        .then(setLawnImageUrl)
+        .finally(() => setLoadingImage(false));
+    } else {
+      setLawnImageUrl(null);
+    }
+  }, [open, job?.address?.lawn_image_url]);
+
   if (!job) return null;
 
   const getStatusBadge = (status: string) => {
@@ -60,8 +77,6 @@ const JobDetailsDialog = ({
     const { variant, label } = config[status] || { variant: "secondary", label: status };
     return <Badge variant={variant}>{label}</Badge>;
   };
-
-  const hasLawnImage = !!job.address?.lawn_image_url;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -138,10 +153,14 @@ const JobDetailsDialog = ({
           {/* Lawn Image */}
           <div className="space-y-2">
             <h4 className="text-sm font-semibold">Lawn Area Map</h4>
-            {hasLawnImage ? (
+            {loadingImage ? (
+              <div className="rounded-lg border p-8 flex items-center justify-center">
+                <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+              </div>
+            ) : lawnImageUrl ? (
               <div className="rounded-lg overflow-hidden border">
                 <img 
-                  src={job.address?.lawn_image_url || ""} 
+                  src={lawnImageUrl} 
                   alt="Lawn area" 
                   className="w-full h-48 object-cover"
                 />
