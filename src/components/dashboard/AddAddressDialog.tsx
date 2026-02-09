@@ -110,13 +110,15 @@ const AddAddressDialog = ({ open, onOpenChange, onSuccess }: AddAddressDialogPro
     form.setValue("square_meters", areaInSqm);
   };
 
-  const canProceedToMap = () => {
-    const values = form.getValues();
-    return values.street_address.length >= 5 && 
-           values.city.length >= 2 && 
-           values.state.length >= 2 && 
-           values.postal_code.length >= 3;
-  };
+  const watchedStreet = form.watch("street_address");
+  const watchedCity = form.watch("city");
+  const watchedState = form.watch("state");
+  const watchedPostal = form.watch("postal_code");
+
+  const canProceedToMap = watchedStreet.length >= 5 && 
+         watchedCity.length >= 2 && 
+         watchedState.length >= 2 && 
+         watchedPostal.length >= 3;
 
   const getFullAddress = () => {
     const values = form.getValues();
