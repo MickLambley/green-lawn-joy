@@ -27,7 +27,15 @@ type Address = Database["public"]["Tables"]["addresses"]["Row"];
 type Booking = Database["public"]["Tables"]["bookings"]["Row"];
 type Profile = Database["public"]["Tables"]["profiles"]["Row"];
 
-interface BookingWithDetails extends Booking {
+interface BookingWithDetails extends Partial<Booking> {
+  id: string;
+  status: Booking["status"];
+  scheduled_date: string;
+  time_slot: string;
+  clippings_removal: boolean;
+  grass_length: string;
+  total_price: number | null;
+  notes: string | null;
   address?: Address;
   customerProfile?: Profile;
 }
