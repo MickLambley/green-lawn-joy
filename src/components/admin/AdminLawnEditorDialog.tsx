@@ -43,6 +43,51 @@ interface AdminLawnEditorDialogProps {
   onSaved?: () => void;
 }
 
+// Helper component to load signed URLs for revision images
+const RevisionImage = ({ lawnImageUrl, revisionNumber }: { lawnImageUrl: string | null; revisionNumber: number }) => {
+  const [signedUrl, setSignedUrl] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (lawnImageUrl) {
+      setLoading(true);
+      getLawnImageSignedUrl(lawnImageUrl)
+        .then(setSignedUrl)
+        .finally(() => setLoading(false));
+    }
+  }, [lawnImageUrl]);
+
+  if (!lawnImageUrl) {
+    return (
+      <div className="rounded-lg border p-8 text-center text-muted-foreground bg-muted/50">
+        No lawn image (manual entry)
+      </div>
+    );
+  }
+
+  if (loading) {
+    return (
+      <div className="rounded-lg border p-8 flex items-center justify-center">
+        <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  return signedUrl ? (
+    <div className="rounded-lg overflow-hidden border">
+      <img
+        src={signedUrl}
+        alt={`Revision ${revisionNumber}`}
+        className="w-full h-48 object-cover"
+      />
+    </div>
+  ) : (
+    <div className="rounded-lg border p-8 text-center text-muted-foreground bg-muted/50">
+      Image unavailable
+    </div>
+  );
+};
+
 const AdminLawnEditorDialog = ({
   open,
   onOpenChange,
