@@ -13,6 +13,7 @@ import Dashboard from "./pages/Dashboard";
 import Admin from "./pages/Admin";
 import ContractorDashboard from "./pages/ContractorDashboard";
 import PaymentSuccess from "./pages/PaymentSuccess";
+import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
 
@@ -44,6 +45,11 @@ const App = () => (
           <Route path="/contractor" element={
             <ProtectedRoute requiredRole="contractor" redirectTo="/dashboard">
               <ContractorDashboard />
+            </ProtectedRoute>
+          } />
+          <Route path="/settings" element={
+            <ProtectedRoute redirectTo="/auth">
+              <Settings />
             </ProtectedRoute>
           } />
           <Route path="/payment-success" element={<PaymentSuccess />} />
