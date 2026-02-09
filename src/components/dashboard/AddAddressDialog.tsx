@@ -304,7 +304,7 @@ const AddAddressDialog = ({ open, onOpenChange, onSuccess }: AddAddressDialogPro
           type="button"
           className="flex-1"
           onClick={() => setCurrentStep("map")}
-          disabled={!canProceedToMap()}
+          disabled={!canProceedToMap}
         >
           Next: Mark Lawn Areas
           <ArrowRight className="w-4 h-4 ml-1" />
