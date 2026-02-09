@@ -48,7 +48,10 @@ type Address = Database["public"]["Tables"]["addresses"]["Row"];
 type Contractor = Database["public"]["Tables"]["contractors"]["Row"];
 type Profile = Database["public"]["Tables"]["profiles"]["Row"];
 
-interface BookingWithAddress extends Booking {
+interface BookingWithAddress extends Omit<Booking, 'admin_notes' | 'payment_intent_id' | 'payment_status'> {
+  admin_notes?: string | null;
+  payment_intent_id?: string | null;
+  payment_status?: string;
   address?: Address;
   customerProfile?: Profile;
 }
@@ -132,7 +135,7 @@ const ContractorDashboard = () => {
     // Fetch available jobs (pending, paid, not assigned)
     const { data: availableData } = await supabase
       .from("bookings")
-      .select("*")
+      .select("id, address_id, user_id, scheduled_date, scheduled_time, time_slot, status, total_price, notes, created_at, updated_at, clippings_removal, is_weekend, is_public_holiday, grass_length, contractor_id, contractor_accepted_at, preferred_contractor_id, alternative_date, alternative_time_slot, alternative_suggested_at, alternative_suggested_by, quote_breakdown")
       .eq("status", "pending")
       .eq("payment_status", "paid")
       .is("contractor_id", null)
@@ -167,7 +170,7 @@ const ContractorDashboard = () => {
     // Fetch my accepted jobs
     const { data: myJobsData } = await supabase
       .from("bookings")
-      .select("*")
+      .select("id, address_id, user_id, scheduled_date, scheduled_time, time_slot, status, total_price, notes, created_at, updated_at, clippings_removal, is_weekend, is_public_holiday, grass_length, contractor_id, contractor_accepted_at, preferred_contractor_id, alternative_date, alternative_time_slot, alternative_suggested_at, alternative_suggested_by, quote_breakdown")
       .eq("contractor_id", contractorData.id)
       .in("status", ["confirmed", "pending"])
       .order("scheduled_date", { ascending: true });

@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -19,6 +19,7 @@ import { toast } from "sonner";
 import { Loader2, Save, History, PenTool, MapPin, Eye } from "lucide-react";
 import AdminLawnEditorMap, { AdminLawnEditorMapRef } from "./AdminLawnEditorMap";
 import type { Database } from "@/integrations/supabase/types";
+import { getLawnImageSignedUrl } from "@/lib/storage";
 
 type Address = Database["public"]["Tables"]["addresses"]["Row"];
 
@@ -41,6 +42,51 @@ interface AdminLawnEditorDialogProps {
   address: Address | null;
   onSaved?: () => void;
 }
+
+// Helper component to load signed URLs for revision images
+const RevisionImage = ({ lawnImageUrl, revisionNumber }: { lawnImageUrl: string | null; revisionNumber: number }) => {
+  const [signedUrl, setSignedUrl] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (lawnImageUrl) {
+      setLoading(true);
+      getLawnImageSignedUrl(lawnImageUrl)
+        .then(setSignedUrl)
+        .finally(() => setLoading(false));
+    }
+  }, [lawnImageUrl]);
+
+  if (!lawnImageUrl) {
+    return (
+      <div className="rounded-lg border p-8 text-center text-muted-foreground bg-muted/50">
+        No lawn image (manual entry)
+      </div>
+    );
+  }
+
+  if (loading) {
+    return (
+      <div className="rounded-lg border p-8 flex items-center justify-center">
+        <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  return signedUrl ? (
+    <div className="rounded-lg overflow-hidden border">
+      <img
+        src={signedUrl}
+        alt={`Revision ${revisionNumber}`}
+        className="w-full h-48 object-cover"
+      />
+    </div>
+  ) : (
+    <div className="rounded-lg border p-8 text-center text-muted-foreground bg-muted/50">
+      Image unavailable
+    </div>
+  );
+};
 
 const AdminLawnEditorDialog = ({
   open,
@@ -125,11 +171,8 @@ const AdminLawnEditorDialog = ({
         return null;
       }
 
-      const { data: { publicUrl } } = supabase.storage
-        .from("lawn-images")
-        .getPublicUrl(data.path);
-
-      return publicUrl;
+      // Return the storage path (not public URL - bucket is private)
+      return data.path;
     } catch (error) {
       console.error("Error in uploadLawnImage:", error);
       return null;
@@ -474,19 +517,10 @@ const AdminLawnEditorDialog = ({
                         </div>
                       )}
 
-                      {selectedRevision.lawn_image_url ? (
-                        <div className="rounded-lg overflow-hidden border">
-                          <img
-                            src={selectedRevision.lawn_image_url}
-                            alt={`Revision ${selectedRevision.revision_number}`}
-                            className="w-full h-48 object-cover"
-                          />
-                        </div>
-                      ) : (
-                        <div className="rounded-lg border p-8 text-center text-muted-foreground bg-muted/50">
-                          No lawn image (manual entry)
-                        </div>
-                      )}
+                      <RevisionImage
+                        lawnImageUrl={selectedRevision.lawn_image_url}
+                        revisionNumber={selectedRevision.revision_number}
+                      />
                     </div>
                   )}
                 </div>
