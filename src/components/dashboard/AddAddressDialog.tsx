@@ -99,10 +99,10 @@ const AddAddressDialog = ({ open, onOpenChange, onSuccess }: AddAddressDialogPro
     state: string;
     postal_code: string;
   }) => {
-    form.setValue("street_address", address.street_address);
-    form.setValue("city", address.city);
-    form.setValue("state", address.state);
-    form.setValue("postal_code", address.postal_code);
+    form.setValue("street_address", address.street_address, { shouldValidate: true, shouldDirty: true });
+    form.setValue("city", address.city, { shouldValidate: true, shouldDirty: true });
+    form.setValue("state", address.state, { shouldValidate: true, shouldDirty: true });
+    form.setValue("postal_code", address.postal_code, { shouldValidate: true, shouldDirty: true });
   };
 
   const handleAreaCalculated = (areaInSqm: number) => {
@@ -110,13 +110,15 @@ const AddAddressDialog = ({ open, onOpenChange, onSuccess }: AddAddressDialogPro
     form.setValue("square_meters", areaInSqm);
   };
 
-  const canProceedToMap = () => {
-    const values = form.getValues();
-    return values.street_address.length >= 5 && 
-           values.city.length >= 2 && 
-           values.state.length >= 2 && 
-           values.postal_code.length >= 3;
-  };
+  const watchedStreet = form.watch("street_address");
+  const watchedCity = form.watch("city");
+  const watchedState = form.watch("state");
+  const watchedPostal = form.watch("postal_code");
+
+  const canProceedToMap = watchedStreet.length >= 5 && 
+         watchedCity.length >= 2 && 
+         watchedState.length >= 2 && 
+         watchedPostal.length >= 3;
 
   const getFullAddress = () => {
     const values = form.getValues();
@@ -302,7 +304,7 @@ const AddAddressDialog = ({ open, onOpenChange, onSuccess }: AddAddressDialogPro
           type="button"
           className="flex-1"
           onClick={() => setCurrentStep("map")}
-          disabled={!canProceedToMap()}
+          disabled={!canProceedToMap}
         >
           Next: Mark Lawn Areas
           <ArrowRight className="w-4 h-4 ml-1" />
