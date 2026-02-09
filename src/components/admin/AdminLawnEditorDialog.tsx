@@ -19,6 +19,7 @@ import { toast } from "sonner";
 import { Loader2, Save, History, PenTool, MapPin, Eye } from "lucide-react";
 import AdminLawnEditorMap, { AdminLawnEditorMapRef } from "./AdminLawnEditorMap";
 import type { Database } from "@/integrations/supabase/types";
+import { getLawnImageSignedUrl } from "@/lib/storage";
 
 type Address = Database["public"]["Tables"]["addresses"]["Row"];
 
