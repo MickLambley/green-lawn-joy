@@ -125,11 +125,8 @@ const AdminLawnEditorDialog = ({
         return null;
       }
 
-      const { data: { publicUrl } } = supabase.storage
-        .from("lawn-images")
-        .getPublicUrl(data.path);
-
-      return publicUrl;
+      // Return the storage path (not public URL - bucket is private)
+      return data.path;
     } catch (error) {
       console.error("Error in uploadLawnImage:", error);
       return null;
