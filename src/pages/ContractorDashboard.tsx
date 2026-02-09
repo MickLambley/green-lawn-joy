@@ -48,7 +48,10 @@ type Address = Database["public"]["Tables"]["addresses"]["Row"];
 type Contractor = Database["public"]["Tables"]["contractors"]["Row"];
 type Profile = Database["public"]["Tables"]["profiles"]["Row"];
 
-interface BookingWithAddress extends Booking {
+interface BookingWithAddress extends Omit<Booking, 'admin_notes' | 'payment_intent_id' | 'payment_status'> {
+  admin_notes?: string | null;
+  payment_intent_id?: string | null;
+  payment_status?: string;
   address?: Address;
   customerProfile?: Profile;
 }
