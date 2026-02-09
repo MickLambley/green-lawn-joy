@@ -167,7 +167,7 @@ const ContractorDashboard = () => {
     // Fetch my accepted jobs
     const { data: myJobsData } = await supabase
       .from("bookings")
-      .select("*")
+      .select("id, address_id, user_id, scheduled_date, scheduled_time, time_slot, status, total_price, notes, created_at, updated_at, clippings_removal, is_weekend, is_public_holiday, grass_length, contractor_id, contractor_accepted_at, preferred_contractor_id, alternative_date, alternative_time_slot, alternative_suggested_at, alternative_suggested_by, quote_breakdown")
       .eq("contractor_id", contractorData.id)
       .in("status", ["confirmed", "pending"])
       .order("scheduled_date", { ascending: true });
