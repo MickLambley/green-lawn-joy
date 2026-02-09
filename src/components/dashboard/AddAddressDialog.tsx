@@ -462,7 +462,7 @@ const AddAddressDialog = ({ open, onOpenChange, onSuccess }: AddAddressDialogPro
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className={currentStep === "map" ? "sm:max-w-[700px]" : "sm:max-w-[500px]"}>
+      <DialogContent className={`${currentStep === "map" ? "sm:max-w-[700px]" : "sm:max-w-[500px]"} max-h-[90vh] overflow-y-auto`}>
         <DialogHeader>
           <div className="flex items-center gap-3 mb-2">
             <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
