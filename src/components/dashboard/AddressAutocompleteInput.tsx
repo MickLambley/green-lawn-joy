@@ -73,12 +73,16 @@ const AddressAutocompleteInput = ({
       </div>
 
       {showSuggestions && suggestions.length > 0 && (
-        <div className="absolute z-50 w-full mt-1 bg-popover border rounded-lg shadow-lg max-h-60 overflow-auto">
+        <div className="absolute z-[100] w-full mt-1 bg-popover border rounded-lg shadow-lg max-h-60 overflow-auto">
           {suggestions.map((suggestion, index) => (
             <button
               key={index}
               type="button"
-              onClick={() => handleSelectSuggestion(suggestion)}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                handleSelectSuggestion(suggestion);
+              }}
               className="w-full text-left px-3 py-2.5 hover:bg-muted transition-colors flex items-start gap-2 border-b last:border-b-0"
             >
               <MapPin className="w-4 h-4 mt-0.5 text-muted-foreground flex-shrink-0" />
