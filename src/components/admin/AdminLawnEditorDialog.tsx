@@ -472,19 +472,10 @@ const AdminLawnEditorDialog = ({
                         </div>
                       )}
 
-                      {selectedRevision.lawn_image_url ? (
-                        <div className="rounded-lg overflow-hidden border">
-                          <img
-                            src={selectedRevision.lawn_image_url}
-                            alt={`Revision ${selectedRevision.revision_number}`}
-                            className="w-full h-48 object-cover"
-                          />
-                        </div>
-                      ) : (
-                        <div className="rounded-lg border p-8 text-center text-muted-foreground bg-muted/50">
-                          No lawn image (manual entry)
-                        </div>
-                      )}
+                      <RevisionImage
+                        lawnImageUrl={selectedRevision.lawn_image_url}
+                        revisionNumber={selectedRevision.revision_number}
+                      />
                     </div>
                   )}
                 </div>
