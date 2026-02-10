@@ -41,7 +41,7 @@ serve(async (req) => {
     // Verify user is an approved contractor
     const { data: contractor, error: contractorError } = await supabase
       .from("contractors")
-      .select("id, stripe_account_id, stripe_onboarding_complete, user_id")
+      .select("id, stripe_account_id, stripe_onboarding_complete, user_id, tier")
       .eq("user_id", userId)
       .single();
 
