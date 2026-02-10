@@ -584,7 +584,10 @@ const ContractorJobComplete = () => {
               <Button
                 variant="outline"
                 className="flex-1"
-                onClick={() => beforeCameraRef.current?.click()}
+                onClick={() => {
+                  photoLogger.info("BUTTON CLICK: Before - Take Photo (camera)", { timestamp: Date.now() });
+                  beforeCameraRef.current?.click();
+                }}
               >
                 <Camera className="w-4 h-4 mr-2" />
                 Take Photo
@@ -592,7 +595,10 @@ const ContractorJobComplete = () => {
               <Button
                 variant="outline"
                 className="flex-1"
-                onClick={() => beforeGalleryRef.current?.click()}
+                onClick={() => {
+                  photoLogger.info("BUTTON CLICK: Before - Gallery", { timestamp: Date.now() });
+                  beforeGalleryRef.current?.click();
+                }}
               >
                 <ImageIcon className="w-4 h-4 mr-2" />
                 Gallery
