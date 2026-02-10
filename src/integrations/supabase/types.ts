@@ -138,6 +138,7 @@ export type Database = {
           alternative_time_slot: string | null
           charged_at: string | null
           clippings_removal: boolean
+          completed_at: string | null
           contractor_accepted_at: string | null
           contractor_id: string | null
           created_at: string
@@ -170,6 +171,7 @@ export type Database = {
           alternative_time_slot?: string | null
           charged_at?: string | null
           clippings_removal?: boolean
+          completed_at?: string | null
           contractor_accepted_at?: string | null
           contractor_id?: string | null
           created_at?: string
@@ -202,6 +204,7 @@ export type Database = {
           alternative_time_slot?: string | null
           charged_at?: string | null
           clippings_removal?: boolean
+          completed_at?: string | null
           contractor_accepted_at?: string | null
           contractor_id?: string | null
           created_at?: string
@@ -316,6 +319,51 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      job_photos: {
+        Row: {
+          booking_id: string
+          contractor_id: string
+          exif_timestamp: string | null
+          id: string
+          photo_type: string
+          photo_url: string
+          uploaded_at: string
+        }
+        Insert: {
+          booking_id: string
+          contractor_id: string
+          exif_timestamp?: string | null
+          id?: string
+          photo_type: string
+          photo_url: string
+          uploaded_at?: string
+        }
+        Update: {
+          booking_id?: string
+          contractor_id?: string
+          exif_timestamp?: string | null
+          id?: string
+          photo_type?: string
+          photo_url?: string
+          uploaded_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "job_photos_booking_id_fkey"
+            columns: ["booking_id"]
+            isOneToOne: false
+            referencedRelation: "bookings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_photos_contractor_id_fkey"
+            columns: ["contractor_id"]
+            isOneToOne: false
+            referencedRelation: "contractors"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       lawn_area_revisions: {
         Row: {
@@ -544,7 +592,12 @@ export type Database = {
     Enums: {
       address_status: "pending" | "verified" | "rejected"
       app_role: "admin" | "user" | "contractor"
-      booking_status: "pending" | "confirmed" | "completed" | "cancelled"
+      booking_status:
+        | "pending"
+        | "confirmed"
+        | "completed"
+        | "cancelled"
+        | "completed_pending_verification"
       slope_type: "flat" | "mild" | "steep"
     }
     CompositeTypes: {
@@ -675,7 +728,13 @@ export const Constants = {
     Enums: {
       address_status: ["pending", "verified", "rejected"],
       app_role: ["admin", "user", "contractor"],
-      booking_status: ["pending", "confirmed", "completed", "cancelled"],
+      booking_status: [
+        "pending",
+        "confirmed",
+        "completed",
+        "cancelled",
+        "completed_pending_verification",
+      ],
       slope_type: ["flat", "mild", "steep"],
     },
   },
