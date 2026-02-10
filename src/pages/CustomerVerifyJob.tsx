@@ -105,6 +105,14 @@ const CustomerVerifyJob = () => {
       return;
     }
 
+    // Allow access for completed_pending_verification, completed (within 7 days), disputed, post_payment_dispute
+    const allowedStatuses = ["completed_pending_verification", "completed", "disputed", "post_payment_dispute"];
+    if (!allowedStatuses.includes(bookingData.status)) {
+      toast.error("This booking cannot be reviewed");
+      navigate("/dashboard");
+      return;
+    }
+
     setBooking(bookingData);
 
     // Get contractor name
@@ -250,6 +258,22 @@ const CustomerVerifyJob = () => {
     : "";
 
   const isVerifiable = booking.status === "completed_pending_verification";
+  const isCompleted = booking.status === "completed";
+  const isPostPaymentDispute = booking.status === "post_payment_dispute";
+  const isAlreadyDisputed = booking.status === "disputed" || isPostPaymentDispute;
+
+  // Check if within 7-day dispute window for completed bookings
+  const withinDisputeWindow = (() => {
+    if (!booking.completed_at) return false;
+    const completedAt = new Date(booking.completed_at).getTime();
+    const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
+    return Date.now() - completedAt < sevenDaysMs;
+  })();
+
+  const canDispute = (isVerifiable || (isCompleted && withinDisputeWindow)) && !approved && !disputed;
+  const daysRemaining = booking.completed_at
+    ? Math.max(0, Math.ceil((new Date(booking.completed_at).getTime() + 7 * 24 * 60 * 60 * 1000 - Date.now()) / (1000 * 60 * 60 * 24)))
+    : 0;
 
   return (
     <div className="min-h-screen bg-background">
@@ -297,8 +321,8 @@ const CustomerVerifyJob = () => {
           <CardContent className="pt-6 space-y-3">
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-semibold">Job #{bookingId?.slice(0, 8)}</h2>
-              <Badge variant={isVerifiable ? "secondary" : "outline"}>
-                {isVerifiable ? "Awaiting Review" : booking.status === "disputed" ? "Disputed" : "Completed"}
+              <Badge variant={isVerifiable ? "secondary" : isAlreadyDisputed ? "destructive" : "outline"}>
+                {isVerifiable ? "Awaiting Review" : isPostPaymentDispute ? "Post-Payment Dispute" : booking.status === "disputed" ? "Disputed" : "Completed"}
               </Badge>
             </div>
             <p className="text-sm text-muted-foreground">
@@ -308,6 +332,11 @@ const CustomerVerifyJob = () => {
             <p className="text-lg font-semibold text-primary">
               ${Number(booking.total_price).toFixed(2)}
             </p>
+            {isCompleted && withinDisputeWindow && !approved && !disputed && (
+              <p className="text-xs text-muted-foreground">
+                ⏰ You have {daysRemaining} day{daysRemaining !== 1 ? "s" : ""} left to report an issue
+              </p>
+            )}
           </CardContent>
         </Card>
 
@@ -360,6 +389,25 @@ const CustomerVerifyJob = () => {
               onClick={() => navigate("/dashboard")}
             >
               I'll Review Later
+            </Button>
+          </div>
+        )}
+
+        {/* Post-payment dispute button for completed bookings within 7-day window */}
+        {isCompleted && withinDisputeWindow && !approved && !disputed && (
+          <div className="space-y-3">
+            <Card className="border-yellow-500/30 bg-yellow-50 dark:bg-yellow-950/20">
+              <CardContent className="pt-6 text-sm text-yellow-800 dark:text-yellow-200">
+                <p>Payment has already been released. If you report an issue, our team will review it and may issue a refund from the platform balance.</p>
+              </CardContent>
+            </Card>
+            <Button
+              variant="outline"
+              className="w-full border-yellow-500 text-yellow-700 hover:bg-yellow-50 dark:text-yellow-400 dark:hover:bg-yellow-950/30"
+              onClick={() => setDisputeDialogOpen(true)}
+            >
+              <AlertTriangle className="w-5 h-5 mr-2" />
+              Report an Issue
             </Button>
           </div>
         )}

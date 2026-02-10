@@ -20,6 +20,7 @@ import {
   Bell,
   Trash2,
   Pencil,
+  AlertTriangle,
 } from "lucide-react";
 import {
   AlertDialog,
@@ -366,7 +367,7 @@ const Dashboard = () => {
   const verifiedAddresses = addresses.filter((a) => a.status === "verified");
   const pendingAddresses = addresses.filter((a) => a.status === "pending");
   const upcomingBookings = bookings.filter((b) => b.status === "pending" || b.status === "confirmed");
-  const completedBookings = bookings.filter((b) => b.status === "completed" || b.status === "completed_pending_verification");
+  const completedBookings = bookings.filter((b) => b.status === "completed" || b.status === "completed_pending_verification" || b.status === "post_payment_dispute");
 
   return (
     <div className="min-h-screen bg-background">
@@ -787,6 +788,22 @@ const Dashboard = () => {
                             Review Job
                           </Button>
                         )}
+                        {booking.status === "completed" && booking.completed_at && (() => {
+                          const completedAt = new Date(booking.completed_at).getTime();
+                          const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
+                          const withinWindow = Date.now() - completedAt < sevenDaysMs;
+                          return withinWindow;
+                        })() && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="border-yellow-500 text-yellow-700 hover:bg-yellow-50 dark:text-yellow-400 dark:hover:bg-yellow-950/30"
+                            onClick={() => navigate(`/customer/bookings/${booking.id}/verify`)}
+                          >
+                            <AlertTriangle className="w-3 h-3 mr-1" />
+                            Report Issue
+                          </Button>
+                        )}
                       </div>
                       {suggestions.length > 0 && (
                         <AlternativeSuggestionsCard
@@ -795,7 +812,7 @@ const Dashboard = () => {
                           onSuggestionResponse={() => user && fetchUserData(user.id)}
                         />
                       )}
-                      {(booking.status === "completed_pending_verification" || booking.status === "completed") && (
+                      {(booking.status === "completed_pending_verification" || booking.status === "completed" || booking.status === "post_payment_dispute") && (
                         <JobPhotosGallery bookingId={booking.id} />
                       )}
                     </div>

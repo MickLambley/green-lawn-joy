@@ -658,6 +658,7 @@ export type Database = {
         | "cancelled"
         | "completed_pending_verification"
         | "disputed"
+        | "post_payment_dispute"
       slope_type: "flat" | "mild" | "steep"
     }
     CompositeTypes: {
@@ -795,6 +796,7 @@ export const Constants = {
         "cancelled",
         "completed_pending_verification",
         "disputed",
+        "post_payment_dispute",
       ],
       slope_type: ["flat", "mild", "steep"],
     },
