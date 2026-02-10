@@ -37,6 +37,7 @@ import BookingDialog from "@/components/dashboard/BookingDialog";
 import NotificationsPopover from "@/components/dashboard/NotificationsPopover";
 import CompletedServicesDialog from "@/components/dashboard/CompletedServicesDialog";
 import { AlternativeSuggestionsCard } from "@/components/dashboard/AlternativeSuggestionsCard";
+import JobPhotosGallery from "@/components/dashboard/JobPhotosGallery";
 import type { Database } from "@/integrations/supabase/types";
 
 type AlternativeSuggestion = {
@@ -336,6 +337,7 @@ const Dashboard = () => {
       rejected: { variant: "destructive", label: "Rejected" },
       confirmed: { variant: "default", label: "Confirmed" },
       completed: { variant: "outline", label: "Completed" },
+      completed_pending_verification: { variant: "secondary", label: "Awaiting Review" },
       cancelled: { variant: "destructive", label: "Cancelled" },
     };
     const { variant, label } = config[status] || { variant: "secondary", label: status };
@@ -363,7 +365,7 @@ const Dashboard = () => {
   const verifiedAddresses = addresses.filter((a) => a.status === "verified");
   const pendingAddresses = addresses.filter((a) => a.status === "pending");
   const upcomingBookings = bookings.filter((b) => b.status === "pending" || b.status === "confirmed");
-  const completedBookings = bookings.filter((b) => b.status === "completed");
+  const completedBookings = bookings.filter((b) => b.status === "completed" || b.status === "completed_pending_verification");
 
   return (
     <div className="min-h-screen bg-background">
@@ -782,6 +784,9 @@ const Dashboard = () => {
                           bookingId={booking.id}
                           onSuggestionResponse={() => user && fetchUserData(user.id)}
                         />
+                      )}
+                      {(booking.status === "completed_pending_verification" || booking.status === "completed") && (
+                        <JobPhotosGallery bookingId={booking.id} />
                       )}
                     </div>
                   );
