@@ -53,7 +53,7 @@ serve(async (req) => {
 
     logStep("Booking verified", { bookingId, status: booking.status });
 
-    // Get contractor details for Stripe transfer
+    // Get contractor details
     const { data: contractor } = await supabase
       .from("contractors")
       .select("id, user_id, stripe_account_id")
@@ -62,28 +62,36 @@ serve(async (req) => {
 
     if (!contractor) throw new Error("Contractor not found");
 
-    // Release payout via Stripe transfer if contractor has a connected account
-    const stripe = new Stripe(stripeKey, { apiVersion: "2025-08-27.basil" });
+    // Trigger payout via release-payout function
+    logStep("Calling release-payout");
+    const payoutResponse = await fetch(
+      `${supabaseUrl}/functions/v1/release-payout`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${supabaseServiceKey}`,
+        },
+        body: JSON.stringify({ bookingId }),
+      }
+    );
 
-    if (booking.payment_intent_id && contractor.stripe_account_id) {
-      logStep("Releasing payout", { paymentIntentId: booking.payment_intent_id, stripeAccount: contractor.stripe_account_id });
-      // Payout is handled by Stripe Connect - the transfer was already set up when the charge was created.
-      // Nothing extra needed - Stripe automatically transfers funds to the connected account.
+    const payoutResult = await payoutResponse.json();
+    if (!payoutResponse.ok) {
+      logStep("Payout release failed", { error: payoutResult.error });
+      // Still update booking status even if payout fails - payout can be retried
+    } else {
+      logStep("Payout released successfully", { payoutId: payoutResult.payoutId });
     }
 
-    // Update booking
-    const now = new Date().toISOString();
+    // Update booking status to completed (release-payout may have done this already)
     const { error: updateError } = await supabase
       .from("bookings")
-      .update({
-        status: "completed",
-        payout_status: "released",
-        payout_released_at: now,
-      })
+      .update({ status: "completed" })
       .eq("id", bookingId);
 
-    if (updateError) throw new Error(`Failed to update booking: ${updateError.message}`);
-    logStep("Booking updated to completed/released");
+    if (updateError) logStep("Booking status update warning", { error: updateError.message });
+    logStep("Booking updated to completed");
 
     // Save review if rating provided
     if (rating && rating >= 1 && rating <= 5) {
