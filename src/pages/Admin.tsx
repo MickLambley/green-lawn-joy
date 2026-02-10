@@ -30,10 +30,11 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
-import { Leaf, LogOut, MapPin, Calendar, Check, X, Eye, Settings, Users, PenTool } from "lucide-react";
+import { Leaf, LogOut, MapPin, Calendar, Check, X, Eye, Settings, Users, PenTool, AlertTriangle } from "lucide-react";
 import PricingSettingsTab from "@/components/admin/PricingSettingsTab";
 import ContractorApplicationsTab from "@/components/admin/ContractorApplicationsTab";
 import AdminLawnEditorDialog from "@/components/admin/AdminLawnEditorDialog";
+import AdminDisputesTab from "@/components/admin/AdminDisputesTab";
 import type { Database } from "@/integrations/supabase/types";
 
 // Badge component for pending contractors
