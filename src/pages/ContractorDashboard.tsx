@@ -134,6 +134,44 @@ const ContractorDashboard = () => {
     // Only fetch jobs if approved
     if (contractorData.approval_status === "approved") {
       fetchJobs(contractorData);
+      fetchStripeStatus();
+    }
+  };
+
+  const fetchStripeStatus = async () => {
+    try {
+      const { data, error } = await supabase.functions.invoke("stripe-connect", {
+        body: { action: "status" },
+      });
+      if (!error && data) {
+        setStripeStatus({
+          onboarding_complete: data.onboarding_complete ?? false,
+          payouts_enabled: data.payouts_enabled ?? false,
+          loading: false,
+        });
+      } else {
+        setStripeStatus(prev => ({ ...prev, loading: false }));
+      }
+    } catch {
+      setStripeStatus(prev => ({ ...prev, loading: false }));
+    }
+  };
+
+  const handleCompleteStripeSetup = async () => {
+    setStripeSetupLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("stripe-connect", {
+        body: { action: "create_account_link" },
+      });
+      if (error || !data?.url) {
+        toast.error("Failed to create setup link");
+        return;
+      }
+      window.open(data.url, "_blank");
+    } catch {
+      toast.error("Failed to start Stripe setup");
+    } finally {
+      setStripeSetupLoading(false);
     }
   };
 
