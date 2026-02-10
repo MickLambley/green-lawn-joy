@@ -320,6 +320,62 @@ export type Database = {
         }
         Relationships: []
       }
+      disputes: {
+        Row: {
+          booking_id: string
+          contractor_response: string | null
+          contractor_response_photos: string[] | null
+          created_at: string
+          customer_photos: string[] | null
+          description: string
+          id: string
+          raised_by: string
+          refund_percentage: number | null
+          resolution: string | null
+          resolved_at: string | null
+          resolved_by: string | null
+          status: string
+        }
+        Insert: {
+          booking_id: string
+          contractor_response?: string | null
+          contractor_response_photos?: string[] | null
+          created_at?: string
+          customer_photos?: string[] | null
+          description: string
+          id?: string
+          raised_by: string
+          refund_percentage?: number | null
+          resolution?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          status?: string
+        }
+        Update: {
+          booking_id?: string
+          contractor_response?: string | null
+          contractor_response_photos?: string[] | null
+          created_at?: string
+          customer_photos?: string[] | null
+          description?: string
+          id?: string
+          raised_by?: string
+          refund_percentage?: number | null
+          resolution?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "disputes_booking_id_fkey"
+            columns: ["booking_id"]
+            isOneToOne: false
+            referencedRelation: "bookings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       job_photos: {
         Row: {
           booking_id: string
@@ -598,6 +654,7 @@ export type Database = {
         | "completed"
         | "cancelled"
         | "completed_pending_verification"
+        | "disputed"
       slope_type: "flat" | "mild" | "steep"
     }
     CompositeTypes: {
@@ -734,6 +791,7 @@ export const Constants = {
         "completed",
         "cancelled",
         "completed_pending_verification",
+        "disputed",
       ],
       slope_type: ["flat", "mild", "steep"],
     },
