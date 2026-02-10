@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Index from "./pages/Index";
+import CustomerVerifyJob from "./pages/CustomerVerifyJob";
 import About from "./pages/About";
 import Contractors from "./pages/Contractors";
 import Auth from "./pages/Auth";
@@ -58,6 +59,11 @@ const App = () => (
           <Route path="/settings" element={
             <ProtectedRoute redirectTo="/auth">
               <Settings />
+            </ProtectedRoute>
+          } />
+          <Route path="/customer/bookings/:id/verify" element={
+            <ProtectedRoute redirectTo="/auth">
+              <CustomerVerifyJob />
             </ProtectedRoute>
           } />
           <Route path="/payment-success" element={<PaymentSuccess />} />

@@ -338,6 +338,7 @@ const Dashboard = () => {
       confirmed: { variant: "default", label: "Confirmed" },
       completed: { variant: "outline", label: "Completed" },
       completed_pending_verification: { variant: "secondary", label: "Awaiting Review" },
+      disputed: { variant: "destructive", label: "Disputed" },
       cancelled: { variant: "destructive", label: "Cancelled" },
     };
     const { variant, label } = config[status] || { variant: "secondary", label: status };
@@ -761,7 +762,7 @@ const Dashboard = () => {
                             )}
                           </div>
                         </div>
-                        {canModifyBooking(booking) && (
+                      {canModifyBooking(booking) && (
                           <div className="flex items-center gap-2">
                             <Button size="sm" variant="outline" onClick={() => handleEditBooking(booking)}>
                               <Pencil className="w-4 h-4" />
@@ -776,6 +777,15 @@ const Dashboard = () => {
                               <Trash2 className="w-4 h-4" />
                             </Button>
                           </div>
+                        )}
+                        {booking.status === "completed_pending_verification" && (
+                          <Button
+                            size="sm"
+                            className="bg-green-600 hover:bg-green-700 text-white"
+                            onClick={() => navigate(`/customer/bookings/${booking.id}/verify`)}
+                          >
+                            Review Job
+                          </Button>
                         )}
                       </div>
                       {suggestions.length > 0 && (
