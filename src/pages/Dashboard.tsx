@@ -37,6 +37,7 @@ import BookingDialog from "@/components/dashboard/BookingDialog";
 import NotificationsPopover from "@/components/dashboard/NotificationsPopover";
 import CompletedServicesDialog from "@/components/dashboard/CompletedServicesDialog";
 import { AlternativeSuggestionsCard } from "@/components/dashboard/AlternativeSuggestionsCard";
+import JobPhotosGallery from "@/components/dashboard/JobPhotosGallery";
 import type { Database } from "@/integrations/supabase/types";
 
 type AlternativeSuggestion = {
