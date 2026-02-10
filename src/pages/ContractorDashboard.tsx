@@ -186,9 +186,10 @@ const ContractorDashboard = () => {
     // Fetch available jobs (pending, paid, not assigned)
     const { data: availableData } = await supabase
       .from("bookings")
-      .select("id, address_id, user_id, scheduled_date, scheduled_time, time_slot, status, total_price, notes, created_at, updated_at, clippings_removal, is_weekend, is_public_holiday, grass_length, contractor_id, contractor_accepted_at, preferred_contractor_id, alternative_date, alternative_time_slot, alternative_suggested_at, alternative_suggested_by, quote_breakdown")
+      .select("id, address_id, user_id, scheduled_date, scheduled_time, time_slot, status, total_price, notes, created_at, updated_at, clippings_removal, is_weekend, is_public_holiday, grass_length, contractor_id, contractor_accepted_at, preferred_contractor_id, alternative_date, alternative_time_slot, alternative_suggested_at, alternative_suggested_by, quote_breakdown, payment_status, payment_method_id")
       .eq("status", "pending")
-      .eq("payment_status", "paid")
+      .eq("payment_status", "pending")
+      .not("payment_method_id", "is", null)
       .is("contractor_id", null)
       .order("scheduled_date", { ascending: true });
 
@@ -249,25 +250,58 @@ const ContractorDashboard = () => {
     }
   };
 
+  const [acceptingJobId, setAcceptingJobId] = useState<string | null>(null);
+
   const handleAcceptJob = async (booking: BookingWithAddress) => {
     if (!contractor) return;
 
-    const { error } = await supabase
-      .from("bookings")
-      .update({
-        contractor_id: contractor.id,
-        contractor_accepted_at: new Date().toISOString(),
-        status: "confirmed",
-      })
-      .eq("id", booking.id);
+    setAcceptingJobId(booking.id);
+    try {
+      const { data, error } = await supabase.functions.invoke("charge-customer", {
+        body: { bookingId: booking.id },
+      });
 
-    if (error) {
-      toast.error("Failed to accept job");
-      return;
+      if (error) {
+        console.error("Charge customer error:", error);
+        toast.error("Failed to process payment. Please try again.");
+        return;
+      }
+
+      if (data?.error) {
+        if (data.isCardError) {
+          toast.error("Customer's card was declined. The booking has been returned to the pool.");
+          // Unassign contractor and reset booking
+          await supabase
+            .from("bookings")
+            .update({
+              contractor_id: null,
+              contractor_accepted_at: null,
+              status: "pending",
+            })
+            .eq("id", booking.id);
+
+          // Notify customer to update payment method
+          await supabase.from("notifications").insert({
+            user_id: booking.user_id,
+            title: "Payment Failed",
+            message: "Your card was declined when a contractor tried to accept your job. Please update your payment method and rebook.",
+            type: "error",
+            booking_id: booking.id,
+          });
+        } else {
+          toast.error(data.error || "Failed to accept job");
+        }
+        return;
+      }
+
+      toast.success("Job accepted! Payment captured and booking confirmed.");
+      fetchJobs(contractor);
+    } catch (err) {
+      console.error("Accept job error:", err);
+      toast.error("An unexpected error occurred. Please try again.");
+    } finally {
+      setAcceptingJobId(null);
     }
-
-    toast.success("Job accepted! It's now in your schedule.");
-    fetchJobs(contractor);
   };
 
   const handleSuggestAlternative = async () => {
@@ -638,9 +672,13 @@ const ContractorDashboard = () => {
                       </TableCell>
                       <TableCell>
                         <div className="flex gap-2">
-                          <Button size="sm" onClick={(e) => { e.stopPropagation(); handleAcceptJob(job); }}>
-                            <Check className="w-4 h-4 mr-1" />
-                            Accept
+                          <Button size="sm" disabled={acceptingJobId === job.id} onClick={(e) => { e.stopPropagation(); handleAcceptJob(job); }}>
+                            {acceptingJobId === job.id ? (
+                              <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                            ) : (
+                              <Check className="w-4 h-4 mr-1" />
+                            )}
+                            {acceptingJobId === job.id ? "Processing..." : "Accept"}
                           </Button>
                           <Button
                             size="sm"
