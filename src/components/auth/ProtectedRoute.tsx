@@ -31,26 +31,33 @@ const ProtectedRoute = ({
         return;
       }
 
+      // Get all roles for the user
+      const { data: userRoles, error } = await supabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", user.id);
+
+      if (error) {
+        console.error("Error checking roles:", error);
+        setAuthorized(false);
+        return;
+      }
+
+      // Admin users get access to everything
+      const isAdmin = userRoles?.some(r => r.role === 'admin');
+      if (isAdmin) {
+        setAuthorized(true);
+        return;
+      }
+
       // If no specific role required, just check if logged in
       if (!requiredRole) {
         setAuthorized(true);
         return;
       }
 
-      // Check if user has the required role
-      const { data: roles, error } = await supabase
-        .from("user_roles")
-        .select("role")
-        .eq("user_id", user.id)
-        .eq("role", requiredRole);
-
-      if (error) {
-        console.error("Error checking role:", error);
-        setAuthorized(false);
-        return;
-      }
-
-      setAuthorized(roles && roles.length > 0);
+      // Check for the specific required role
+      setAuthorized(userRoles?.some(r => r.role === requiredRole) ?? false);
     } catch (error) {
       console.error("Authorization check failed:", error);
       setAuthorized(false);
