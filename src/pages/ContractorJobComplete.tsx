@@ -446,7 +446,6 @@ const ContractorJobComplete = () => {
               ref={beforeInputRef}
               type="file"
               accept="image/*"
-              capture="environment"
               multiple
               className="hidden"
               onChange={(e) => handleFileSelect(e.target.files, "before")}
