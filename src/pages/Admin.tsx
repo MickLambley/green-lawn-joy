@@ -30,10 +30,11 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
-import { Leaf, LogOut, MapPin, Calendar, Check, X, Eye, Settings, Users, PenTool } from "lucide-react";
+import { Leaf, LogOut, MapPin, Calendar, Check, X, Eye, Settings, Users, PenTool, AlertTriangle } from "lucide-react";
 import PricingSettingsTab from "@/components/admin/PricingSettingsTab";
 import ContractorApplicationsTab from "@/components/admin/ContractorApplicationsTab";
 import AdminLawnEditorDialog from "@/components/admin/AdminLawnEditorDialog";
+import AdminDisputesTab from "@/components/admin/AdminDisputesTab";
 import type { Database } from "@/integrations/supabase/types";
 
 // Badge component for pending contractors
@@ -404,6 +405,10 @@ const Admin = () => {
               Contractors
               <PendingContractorsBadge />
             </TabsTrigger>
+            <TabsTrigger value="disputes" className="flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4" />
+              Disputes
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="addresses">
@@ -540,6 +545,10 @@ const Admin = () => {
 
           <TabsContent value="contractors">
             <ContractorApplicationsTab />
+          </TabsContent>
+
+          <TabsContent value="disputes">
+            <AdminDisputesTab />
           </TabsContent>
         </Tabs>
       </main>
