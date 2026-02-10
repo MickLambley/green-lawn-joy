@@ -249,25 +249,58 @@ const ContractorDashboard = () => {
     }
   };
 
+  const [acceptingJobId, setAcceptingJobId] = useState<string | null>(null);
+
   const handleAcceptJob = async (booking: BookingWithAddress) => {
     if (!contractor) return;
 
-    const { error } = await supabase
-      .from("bookings")
-      .update({
-        contractor_id: contractor.id,
-        contractor_accepted_at: new Date().toISOString(),
-        status: "confirmed",
-      })
-      .eq("id", booking.id);
+    setAcceptingJobId(booking.id);
+    try {
+      const { data, error } = await supabase.functions.invoke("charge-customer", {
+        body: { bookingId: booking.id },
+      });
 
-    if (error) {
-      toast.error("Failed to accept job");
-      return;
+      if (error) {
+        console.error("Charge customer error:", error);
+        toast.error("Failed to process payment. Please try again.");
+        return;
+      }
+
+      if (data?.error) {
+        if (data.isCardError) {
+          toast.error("Customer's card was declined. The booking has been returned to the pool.");
+          // Unassign contractor and reset booking
+          await supabase
+            .from("bookings")
+            .update({
+              contractor_id: null,
+              contractor_accepted_at: null,
+              status: "pending",
+            })
+            .eq("id", booking.id);
+
+          // Notify customer to update payment method
+          await supabase.from("notifications").insert({
+            user_id: booking.user_id,
+            title: "Payment Failed",
+            message: "Your card was declined when a contractor tried to accept your job. Please update your payment method and rebook.",
+            type: "error",
+            booking_id: booking.id,
+          });
+        } else {
+          toast.error(data.error || "Failed to accept job");
+        }
+        return;
+      }
+
+      toast.success("Job accepted! Payment captured and booking confirmed.");
+      fetchJobs(contractor);
+    } catch (err) {
+      console.error("Accept job error:", err);
+      toast.error("An unexpected error occurred. Please try again.");
+    } finally {
+      setAcceptingJobId(null);
     }
-
-    toast.success("Job accepted! It's now in your schedule.");
-    fetchJobs(contractor);
   };
 
   const handleSuggestAlternative = async () => {
