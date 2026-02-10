@@ -15,7 +15,7 @@ interface PaymentDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   amount: number;
-  onPaymentSuccess: () => void;
+  onPaymentSuccess: (paymentMethodId: string) => void;
   bookingDetails: {
     date: string;
     timeSlot: string;
@@ -26,7 +26,7 @@ interface PaymentDialogProps {
 
 interface CheckoutFormProps {
   amount: number;
-  onPaymentSuccess: () => void;
+  onPaymentSuccess: (paymentMethodId: string) => void;
   bookingDetails: {
     date: string;
     timeSlot: string;
@@ -44,9 +44,7 @@ const CheckoutForm = ({ amount, onPaymentSuccess, bookingDetails }: CheckoutForm
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!stripe || !elements) {
-      return;
-    }
+    if (!stripe || !elements) return;
 
     setProcessing(true);
     setError(null);
@@ -58,21 +56,25 @@ const CheckoutForm = ({ amount, onPaymentSuccess, bookingDetails }: CheckoutForm
       return;
     }
 
-    const { error: confirmError } = await stripe.confirmPayment({
+    // Use confirmSetup instead of confirmPayment — saves card without charging
+    const { error: confirmError, setupIntent } = await stripe.confirmSetup({
       elements,
       confirmParams: {
-        return_url: `${window.location.origin}/payment-success`,
+        return_url: `${window.location.origin}/dashboard`,
       },
       redirect: "if_required",
     });
 
     if (confirmError) {
-      setError(confirmError.message || "Payment failed");
+      setError(confirmError.message || "Failed to save payment method");
       setProcessing(false);
-    } else {
+    } else if (setupIntent) {
       setPaymentComplete(true);
+      const paymentMethodId = typeof setupIntent.payment_method === "string"
+        ? setupIntent.payment_method
+        : setupIntent.payment_method?.id || "";
       setTimeout(() => {
-        onPaymentSuccess();
+        onPaymentSuccess(paymentMethodId);
       }, 1500);
     }
   };
@@ -83,8 +85,11 @@ const CheckoutForm = ({ amount, onPaymentSuccess, bookingDetails }: CheckoutForm
         <div className="w-16 h-16 rounded-full bg-green-100 dark:bg-green-900/20 flex items-center justify-center mx-auto mb-4">
           <CheckCircle className="w-8 h-8 text-green-600" />
         </div>
-        <h3 className="text-lg font-semibold text-foreground mb-2">Payment Successful!</h3>
-        <p className="text-muted-foreground">Your booking has been confirmed.</p>
+        <h3 className="text-lg font-semibold text-foreground mb-2">Payment Method Saved!</h3>
+        <p className="text-muted-foreground text-sm">
+          Your booking request has been sent to contractors in your area.<br />
+          You'll be charged when a contractor accepts your job.
+        </p>
       </div>
     );
   }
@@ -106,9 +111,15 @@ const CheckoutForm = ({ amount, onPaymentSuccess, bookingDetails }: CheckoutForm
           <span className="font-medium text-right">{bookingDetails.address}</span>
         </div>
         <div className="border-t pt-2 mt-2 flex justify-between">
-          <span className="font-semibold">Total</span>
+          <span className="font-semibold">Amount (charged on acceptance)</span>
           <span className="font-bold text-lg text-primary">${amount.toFixed(2)}</span>
         </div>
+      </div>
+
+      {/* Info Banner */}
+      <div className="p-3 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 rounded-lg text-sm flex items-start gap-2">
+        <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+        <span>Your card will be saved but <strong>not charged</strong> until a contractor accepts your job.</span>
       </div>
 
       {/* Stripe Payment Element */}
@@ -124,7 +135,7 @@ const CheckoutForm = ({ amount, onPaymentSuccess, bookingDetails }: CheckoutForm
         </div>
       )}
 
-      {/* Payment Button */}
+      {/* Submit Button */}
       <Button
         type="submit"
         className="w-full"
@@ -134,12 +145,12 @@ const CheckoutForm = ({ amount, onPaymentSuccess, bookingDetails }: CheckoutForm
         {processing ? (
           <>
             <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-            Processing...
+            Saving...
           </>
         ) : (
           <>
             <Lock className="w-4 h-4 mr-2" />
-            Pay ${amount.toFixed(2)}
+            Save Payment Method
           </>
         )}
       </Button>
@@ -177,10 +188,10 @@ const PaymentDialog = ({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <CreditCard className="w-5 h-5 text-primary" />
-            Complete Payment
+            Save Payment Method
           </DialogTitle>
           <DialogDescription>
-            Secure payment powered by Stripe
+            Your card will be saved securely. You won't be charged until a contractor accepts.
           </DialogDescription>
         </DialogHeader>
 
@@ -197,7 +208,7 @@ const PaymentDialog = ({
         ) : !clientSecret ? (
           <div className="py-8 text-center">
             <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-primary" />
-            <p className="text-muted-foreground">Preparing payment...</p>
+            <p className="text-muted-foreground">Preparing secure form...</p>
           </div>
         ) : stripeReady && stripePromise ? (
           <Elements
