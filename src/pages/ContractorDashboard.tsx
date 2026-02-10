@@ -38,6 +38,9 @@ import {
   AlertCircle,
   Clock as ClockIcon2,
   Star,
+  Loader2,
+  CreditCard,
+  CheckCircle,
 } from "lucide-react";
 import { toast } from "sonner";
 import type { Database } from "@/integrations/supabase/types";
