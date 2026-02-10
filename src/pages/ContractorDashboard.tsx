@@ -782,7 +782,7 @@ const ContractorDashboard = () => {
                       <TableCell>{getStatusBadge(job.status)}</TableCell>
                       <TableCell>
                         {job.status === "confirmed" && (
-                          <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); handleCompleteJob(job); }}>
+                          <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); navigate(`/contractor/jobs/${job.id}/complete`); }}>
                             <Check className="w-4 h-4 mr-1" />
                             Complete
                           </Button>
