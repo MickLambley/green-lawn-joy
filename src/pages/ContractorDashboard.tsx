@@ -255,8 +255,15 @@ const ContractorDashboard = () => {
 
   const [acceptingJobId, setAcceptingJobId] = useState<string | null>(null);
 
+  const isStripeReady = stripeStatus.onboarding_complete && !stripeStatus.loading;
+
   const handleAcceptJob = async (booking: BookingWithAddress) => {
     if (!contractor) return;
+
+    if (!isStripeReady) {
+      toast.error("You must complete your Stripe payment setup before accepting jobs. Use the 'Complete Payment Setup' button above.");
+      return;
+    }
 
     // Tier-based restrictions
     const tier = (contractor as any).tier || "probation";
@@ -329,8 +336,12 @@ const ContractorDashboard = () => {
   };
 
   const handleSuggestAlternative = async () => {
-    if (!contractor || !selectedJob || !suggestedDate) return;
+    if (!isStripeReady) {
+      toast.error("You must complete your Stripe payment setup before suggesting times. Use the 'Complete Payment Setup' button above.");
+      return;
+    }
 
+    if (!contractor || !selectedJob || !suggestedDate) return;
     try {
       // Insert into alternative_suggestions table
       const { error: suggestionError } = await supabase
@@ -701,7 +712,9 @@ const ContractorDashboard = () => {
                       </TableCell>
                       <TableCell>
                         <div className="flex gap-2">
-                          <Button size="sm" disabled={acceptingJobId === job.id} onClick={(e) => { e.stopPropagation(); handleAcceptJob(job); }}>
+                          <Button size="sm" disabled={acceptingJobId === job.id || !isStripeReady} onClick={(e) => { e.stopPropagation(); handleAcceptJob(job); }}
+                            title={!isStripeReady ? "Complete Stripe payment setup first" : undefined}
+                          >
                             {acceptingJobId === job.id ? (
                               <Loader2 className="w-4 h-4 mr-1 animate-spin" />
                             ) : (
@@ -712,7 +725,14 @@ const ContractorDashboard = () => {
                           <Button
                             size="sm"
                             variant="outline"
-                            onClick={() => {
+                            disabled={!isStripeReady}
+                            title={!isStripeReady ? "Complete Stripe payment setup first" : undefined}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (!isStripeReady) {
+                                toast.error("You must complete your Stripe payment setup before suggesting times. Use the 'Complete Payment Setup' button above.");
+                                return;
+                              }
                               setSelectedJob(job);
                               setSuggestDialogOpen(true);
                             }}
