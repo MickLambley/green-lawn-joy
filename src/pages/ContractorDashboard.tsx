@@ -740,8 +740,6 @@ const ContractorDashboard = () => {
                             <CalendarClock className="w-4 h-4 mr-1" />
                             Suggest Time
                           </Button>
-                            Suggest Time
-                          </Button>
                         </div>
                       </TableCell>
                     </TableRow>
