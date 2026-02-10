@@ -785,6 +785,9 @@ const Dashboard = () => {
                           onSuggestionResponse={() => user && fetchUserData(user.id)}
                         />
                       )}
+                      {(booking.status === "completed_pending_verification" || booking.status === "completed") && (
+                        <JobPhotosGallery bookingId={booking.id} />
+                      )}
                     </div>
                   );
                 })}
