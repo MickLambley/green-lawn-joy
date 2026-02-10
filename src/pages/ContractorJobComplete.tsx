@@ -25,8 +25,8 @@ import { toast } from "sonner";
 
 interface PhotoItem {
   id?: string;
-  file?: File;
-  previewUrl: string;
+  fileName: string;
+  fileSize: number;
   photoUrl?: string;
   uploading?: boolean;
   uploaded?: boolean;
