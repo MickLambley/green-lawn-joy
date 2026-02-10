@@ -1,0 +1,189 @@
+import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
+
+const logStep = (step: string, details?: Record<string, unknown>) => {
+  const detailsStr = details ? ` - ${JSON.stringify(details)}` : '';
+  console.log(`[DISPUTE-JOB] ${step}${detailsStr}`);
+};
+
+serve(async (req) => {
+  if (req.method === "OPTIONS") {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  try {
+    logStep("Function started");
+
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) throw new Error("No authorization header provided");
+
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    const token = authHeader.replace("Bearer ", "");
+    const { data: userData, error: userError } = await supabase.auth.getUser(token);
+    if (userError || !userData.user) throw new Error("User not authenticated");
+
+    const userId = userData.user.id;
+    logStep("User authenticated", { userId });
+
+    const { bookingId, description, photoUrls } = await req.json();
+    if (!bookingId) throw new Error("Missing bookingId");
+    if (!description || description.length < 20) throw new Error("Description must be at least 20 characters");
+
+    // Fetch booking
+    const { data: booking, error: bookingError } = await supabase
+      .from("bookings")
+      .select("id, user_id, contractor_id, status, total_price, address_id")
+      .eq("id", bookingId)
+      .single();
+
+    if (bookingError || !booking) throw new Error("Booking not found");
+    if (booking.user_id !== userId) throw new Error("Not your booking");
+    if (booking.status !== "completed_pending_verification") throw new Error("Booking is not awaiting verification");
+
+    logStep("Booking verified", { bookingId });
+
+    // Create dispute
+    const { error: disputeError } = await supabase
+      .from("disputes")
+      .insert({
+        booking_id: bookingId,
+        raised_by: "customer",
+        description,
+        customer_photos: photoUrls || [],
+      });
+
+    if (disputeError) throw new Error(`Failed to create dispute: ${disputeError.message}`);
+    logStep("Dispute created");
+
+    // Update booking
+    const { error: updateError } = await supabase
+      .from("bookings")
+      .update({
+        status: "disputed",
+        payout_status: "frozen",
+      })
+      .eq("id", bookingId);
+
+    if (updateError) throw new Error(`Failed to update booking: ${updateError.message}`);
+    logStep("Booking status updated to disputed");
+
+    // Get names for notifications
+    const { data: contractor } = await supabase
+      .from("contractors")
+      .select("id, user_id")
+      .eq("id", booking.contractor_id)
+      .single();
+
+    const [customerProfileResult, contractorProfileResult, contractorAuthResult] = await Promise.all([
+      supabase.from("profiles").select("full_name").eq("user_id", userId).single(),
+      contractor ? supabase.from("profiles").select("full_name").eq("user_id", contractor.user_id).single() : Promise.resolve({ data: null }),
+      contractor ? supabase.auth.admin.getUserById(contractor.user_id) : Promise.resolve({ data: null }),
+    ]);
+
+    const customerName = customerProfileResult.data?.full_name || "Customer";
+    const contractorName = contractorProfileResult.data?.full_name || "Contractor";
+    const contractorEmail = (contractorAuthResult.data as any)?.user?.email;
+
+    // Notify contractor
+    if (contractor) {
+      await supabase.from("notifications").insert({
+        user_id: contractor.user_id,
+        title: "Issue Reported ⚠️",
+        message: `${customerName} has raised an issue with Job #${bookingId.slice(0, 8)}. Please respond within 24 hours.`,
+        type: "warning",
+        booking_id: bookingId,
+      });
+    }
+
+    // Send emails
+    try {
+      const resendApiKey = Deno.env.get("RESEND_API_KEY");
+      if (resendApiKey) {
+        const emailPromises = [];
+
+        // Admin email
+        emailPromises.push(
+          fetch("https://api.resend.com/emails", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${resendApiKey}`,
+            },
+            body: JSON.stringify({
+              from: "Lawn Care <onboarding@resend.dev>",
+              to: ["admin@lawnly.com.au"],
+              subject: `Dispute Raised - Job #${bookingId.slice(0, 8)}`,
+              html: `
+                <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto;">
+                  <h1 style="color: #d97706;">Dispute Raised ⚠️</h1>
+                  <p>A dispute has been raised for Job #${bookingId.slice(0, 8)}. Review required.</p>
+                  <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
+                    <p style="margin: 5px 0;"><strong>Customer:</strong> ${customerName}</p>
+                    <p style="margin: 5px 0;"><strong>Contractor:</strong> ${contractorName}</p>
+                    <p style="margin: 5px 0;"><strong>Amount:</strong> $${Number(booking.total_price).toFixed(2)}</p>
+                    <p style="margin: 5px 0;"><strong>Issue:</strong> ${description}</p>
+                  </div>
+                </div>
+              `,
+            }),
+          })
+        );
+
+        // Contractor email
+        if (contractorEmail) {
+          emailPromises.push(
+            fetch("https://api.resend.com/emails", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${resendApiKey}`,
+              },
+              body: JSON.stringify({
+                from: "Lawn Care <onboarding@resend.dev>",
+                to: [contractorEmail],
+                subject: `Issue Reported - Job #${bookingId.slice(0, 8)}`,
+                html: `
+                  <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto;">
+                    <h1 style="color: #d97706;">Issue Reported ⚠️</h1>
+                    <p>Hi ${contractorName},</p>
+                    <p>The customer has raised an issue with Job #${bookingId.slice(0, 8)}. Please respond within 24 hours.</p>
+                    <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
+                      <p style="margin: 5px 0;"><strong>Issue:</strong> ${description}</p>
+                    </div>
+                    <p style="color: #666; margin-top: 30px;">Best regards,<br>The Lawnly Team</p>
+                  </div>
+                `,
+              }),
+            })
+          );
+        }
+
+        await Promise.all(emailPromises);
+        logStep("Emails sent");
+      }
+    } catch (emailError) {
+      logStep("Email sending failed (non-blocking)", { error: String(emailError) });
+    }
+
+    return new Response(
+      JSON.stringify({ success: true }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
+    );
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    logStep("ERROR", { message: errorMessage });
+    return new Response(
+      JSON.stringify({ error: errorMessage }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
+    );
+  }
+});
