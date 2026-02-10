@@ -20,6 +20,8 @@ interface IdentityBusinessStepProps {
 export const IdentityBusinessStep = ({ data, onChange, userId, onNext }: IdentityBusinessStepProps) => {
   const [isUploading, setIsUploading] = useState(false);
   const [mapLoaded, setMapLoaded] = useState(false);
+  const dataRef = useRef(data);
+  dataRef.current = data;
   const businessAddressInputRef = useRef<HTMLInputElement>(null);
   const mailingAddressInputRef = useRef<HTMLInputElement>(null);
   const businessAutocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
