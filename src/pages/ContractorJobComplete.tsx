@@ -224,7 +224,6 @@ const ContractorJobComplete = () => {
 
       if (uploadError) {
         toast.error(`Photo ${i + 1} of ${total} failed: ${uploadError.message}`);
-        URL.revokeObjectURL(previewUrl);
         setPhotos((prev) => prev.filter((p) => p !== item));
         continue;
       }
