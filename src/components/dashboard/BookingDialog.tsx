@@ -93,6 +93,7 @@ const timeSlots = [
 
 const BookingDialog = ({ open, onOpenChange, addresses, defaultAddressId, onSuccess, onAddressAdded, editingBooking }: BookingDialogProps) => {
   const [step, setStep] = useState<"form" | "quote">("form");
+  const [agreedToTerms, setAgreedToTerms] = useState(false);
   const [loading, setLoading] = useState(false);
   const [pricingSettings, setPricingSettings] = useState<PricingSettings | null>(null);
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
