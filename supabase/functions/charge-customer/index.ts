@@ -118,7 +118,7 @@ serve(async (req) => {
       transfer_data: {
         destination: contractor.stripe_account_id,
       },
-      on_behalf_of: contractor.stripe_account_id,
+      
       statement_descriptor_suffix: "LAWNLY",
       metadata: {
         booking_id: booking.id,
