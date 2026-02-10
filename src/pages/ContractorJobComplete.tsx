@@ -48,6 +48,13 @@ const ContractorJobComplete = () => {
   const [checkQuality, setCheckQuality] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
+  const [uploadProgress, setUploadProgress] = useState<{
+    active: boolean;
+    type: "before" | "after";
+    current: number;
+    total: number;
+  } | null>(null);
+
   const beforeInputRef = useRef<HTMLInputElement>(null);
   const afterInputRef = useRef<HTMLInputElement>(null);
 
