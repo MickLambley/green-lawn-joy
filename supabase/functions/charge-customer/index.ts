@@ -70,6 +70,26 @@ serve(async (req) => {
 
     logStep("Booking fetched", { bookingId, totalPrice: booking.total_price, paymentMethodId: booking.payment_method_id });
 
+    // Tier-based restrictions
+    const tier = (contractor as any).tier || "probation";
+    if (tier === "probation" || tier === "standard") {
+      const maxJobs = tier === "probation" ? 3 : 10;
+      const { count: activeJobs } = await supabase
+        .from("bookings")
+        .select("id", { count: "exact", head: true })
+        .eq("contractor_id", contractor.id)
+        .in("status", ["confirmed", "pending"]);
+
+      if ((activeJobs ?? 0) >= maxJobs) {
+        throw new Error(`You've reached your maximum of ${maxJobs} concurrent jobs for your tier. Complete existing jobs to accept new ones.`);
+      }
+
+      if (tier === "probation" && booking.total_price && Number(booking.total_price) > 150) {
+        throw new Error("As a new contractor, you cannot accept jobs over $150. Complete more jobs to unlock higher-value work.");
+      }
+    }
+    logStep("Tier check passed", { tier });
+
     // Find the Stripe customer for the booking owner
     const { data: customerAuth } = await supabase.auth.admin.getUserById(booking.user_id);
     const customerEmail = customerAuth?.user?.email;
