@@ -258,6 +258,22 @@ const CustomerVerifyJob = () => {
     : "";
 
   const isVerifiable = booking.status === "completed_pending_verification";
+  const isCompleted = booking.status === "completed";
+  const isPostPaymentDispute = booking.status === "post_payment_dispute";
+  const isAlreadyDisputed = booking.status === "disputed" || isPostPaymentDispute;
+
+  // Check if within 7-day dispute window for completed bookings
+  const withinDisputeWindow = (() => {
+    if (!booking.completed_at) return false;
+    const completedAt = new Date(booking.completed_at).getTime();
+    const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
+    return Date.now() - completedAt < sevenDaysMs;
+  })();
+
+  const canDispute = (isVerifiable || (isCompleted && withinDisputeWindow)) && !approved && !disputed;
+  const daysRemaining = booking.completed_at
+    ? Math.max(0, Math.ceil((new Date(booking.completed_at).getTime() + 7 * 24 * 60 * 60 * 1000 - Date.now()) / (1000 * 60 * 60 * 24)))
+    : 0;
 
   return (
     <div className="min-h-screen bg-background">
