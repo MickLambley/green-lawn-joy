@@ -382,21 +382,21 @@ const BookingDialog = ({ open, onOpenChange, addresses, defaultAddressId, onSucc
 
   const handlePaymentDialogClose = async (open: boolean) => {
     if (!open && createdBookingId) {
-      // Payment dialog was closed without completing payment - delete the unpaid booking
+      // Payment dialog was closed without saving payment method - delete the booking
       try {
         const { data: booking } = await supabase
           .from("bookings")
-          .select("payment_status")
+          .select("payment_status, payment_method_id")
           .eq("id", createdBookingId)
           .single();
 
-        if (booking?.payment_status === "unpaid") {
+        if (booking && !booking.payment_method_id) {
           await supabase
             .from("bookings")
             .delete()
             .eq("id", createdBookingId);
           
-          toast.info("Booking cancelled - payment was not completed");
+          toast.info("Booking cancelled - payment method was not saved");
         }
       } catch (error) {
         console.error("Error cleaning up booking:", error);
