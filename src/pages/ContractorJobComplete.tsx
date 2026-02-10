@@ -55,8 +55,10 @@ const ContractorJobComplete = () => {
     total: number;
   } | null>(null);
 
-  const beforeInputRef = useRef<HTMLInputElement>(null);
-  const afterInputRef = useRef<HTMLInputElement>(null);
+  const beforeCameraRef = useRef<HTMLInputElement>(null);
+  const beforeGalleryRef = useRef<HTMLInputElement>(null);
+  const afterCameraRef = useRef<HTMLInputElement>(null);
+  const afterGalleryRef = useRef<HTMLInputElement>(null);
 
   const minPhotos = contractorTier === "probation" ? 2 : 1;
 
