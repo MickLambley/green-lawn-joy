@@ -185,24 +185,33 @@ const ContractorJobComplete = () => {
     files: FileList | null,
     type: "before" | "after"
   ) => {
-    if (!files || !bookingId || !contractor) return;
+    if (!files || !bookingId || !contractor || files.length === 0) return;
 
     const setPhotos = type === "before" ? setBeforePhotos : setAfterPhotos;
+    const fileArray = Array.from(files);
+    const total = fileArray.length;
 
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i];
+    setUploadProgress({ active: true, type, current: 0, total });
 
-      // Compress image to reduce memory usage
+    for (let i = 0; i < fileArray.length; i++) {
+      const file = fileArray[i];
+      setUploadProgress({ active: true, type, current: i + 1, total });
+
+      // Compress image
       let compressed: Blob;
       try {
         compressed = await compressImage(file);
       } catch {
-        toast.error("Failed to process photo. Try a smaller image.");
+        toast.error(`Failed to process photo ${i + 1} of ${total}. Skipping.`);
         continue;
       }
 
       const previewUrl = URL.createObjectURL(compressed);
-      const item: PhotoItem = { file: new File([compressed], file.name, { type: "image/jpeg" }), previewUrl, uploading: true };
+      const item: PhotoItem = {
+        file: new File([compressed], file.name, { type: "image/jpeg" }),
+        previewUrl,
+        uploading: true,
+      };
 
       setPhotos((prev) => [...prev, item]);
 
@@ -214,7 +223,7 @@ const ContractorJobComplete = () => {
         .upload(filePath, compressed, { contentType: "image/jpeg" });
 
       if (uploadError) {
-        toast.error(`Failed to upload photo: ${uploadError.message}`);
+        toast.error(`Photo ${i + 1} of ${total} failed: ${uploadError.message}`);
         URL.revokeObjectURL(previewUrl);
         setPhotos((prev) => prev.filter((p) => p !== item));
         continue;
@@ -228,7 +237,7 @@ const ContractorJobComplete = () => {
       });
 
       if (dbError) {
-        toast.error(`Failed to save photo record: ${dbError.message}`);
+        toast.error(`Photo ${i + 1} record failed: ${dbError.message}`);
         continue;
       }
 
@@ -240,6 +249,8 @@ const ContractorJobComplete = () => {
         )
       );
     }
+
+    setUploadProgress(null);
   };
 
   const handleRemovePhoto = async (
