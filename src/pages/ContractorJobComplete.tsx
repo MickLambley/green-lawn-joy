@@ -9,7 +9,6 @@ import { Progress } from "@/components/ui/progress";
 import {
   Leaf,
   Camera,
-  Upload,
   X,
   Check,
   Loader2,
