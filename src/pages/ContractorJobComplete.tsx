@@ -27,6 +27,7 @@ interface PhotoItem {
   fileName: string;
   fileSize: number;
   photoUrl?: string;
+  thumbnailUrl?: string;
   uploading?: boolean;
   uploaded?: boolean;
 }
