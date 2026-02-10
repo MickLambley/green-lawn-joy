@@ -416,6 +416,11 @@ const ContractorDashboard = () => {
             <div>
               <span className="text-xl font-display font-bold text-foreground">Lawnly</span>
               <Badge variant="outline" className="ml-2">Contractor</Badge>
+              {contractor?.tier && (
+                <span className="ml-2">
+                  <ContractorTierBadge tier={contractor.tier} />
+                </span>
+              )}
             </div>
           </div>
           <div className="flex items-center gap-4">
