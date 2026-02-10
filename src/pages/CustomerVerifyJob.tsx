@@ -321,8 +321,8 @@ const CustomerVerifyJob = () => {
           <CardContent className="pt-6 space-y-3">
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-semibold">Job #{bookingId?.slice(0, 8)}</h2>
-              <Badge variant={isVerifiable ? "secondary" : "outline"}>
-                {isVerifiable ? "Awaiting Review" : booking.status === "disputed" ? "Disputed" : "Completed"}
+              <Badge variant={isVerifiable ? "secondary" : isAlreadyDisputed ? "destructive" : "outline"}>
+                {isVerifiable ? "Awaiting Review" : isPostPaymentDispute ? "Post-Payment Dispute" : booking.status === "disputed" ? "Disputed" : "Completed"}
               </Badge>
             </div>
             <p className="text-sm text-muted-foreground">
@@ -332,6 +332,11 @@ const CustomerVerifyJob = () => {
             <p className="text-lg font-semibold text-primary">
               ${Number(booking.total_price).toFixed(2)}
             </p>
+            {isCompleted && withinDisputeWindow && !approved && !disputed && (
+              <p className="text-xs text-muted-foreground">
+                ⏰ You have {daysRemaining} day{daysRemaining !== 1 ? "s" : ""} left to report an issue
+              </p>
+            )}
           </CardContent>
         </Card>
 
