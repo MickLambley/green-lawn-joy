@@ -406,6 +406,18 @@ const ContractorJobComplete = () => {
       </header>
 
       <main className="container mx-auto px-4 py-8 max-w-2xl space-y-6">
+        {/* Debug Log Download */}
+        <div className="flex justify-end">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-xs text-muted-foreground"
+            onClick={() => photoLogger.downloadLogs()}
+          >
+            <Download className="w-3 h-3 mr-1" />
+            Download Debug Logs
+          </Button>
+        </div>
         {/* Job Summary */}
         <Card>
           <CardHeader>
