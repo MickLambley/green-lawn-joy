@@ -257,14 +257,21 @@ const ContractorJobComplete = () => {
         continue;
       }
 
+      const { data: urlData } = supabase.storage.from("job-photos").getPublicUrl(filePath);
+
       setPhotos((prev) =>
         prev.map((p) =>
           p === item
-            ? { ...p, uploading: false, uploaded: true, photoUrl: filePath }
+            ? { ...p, uploading: false, uploaded: true, photoUrl: filePath, thumbnailUrl: urlData.publicUrl }
             : p
         )
       );
     }
+
+    // Clear file inputs to release file references from memory
+    [beforeCameraRef, beforeGalleryRef, afterCameraRef, afterGalleryRef].forEach(ref => {
+      if (ref.current) ref.current.value = "";
+    });
 
     setUploadProgress(null);
   };
