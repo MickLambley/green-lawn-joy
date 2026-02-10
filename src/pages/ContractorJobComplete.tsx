@@ -155,36 +155,24 @@ const ContractorJobComplete = () => {
     setLoading(false);
   };
 
-  const compressImage = async (file: File, maxWidth = 800, quality = 0.65): Promise<Blob> => {
-    // Use createImageBitmap with resize for memory-efficient decoding
-    // This avoids loading the full-resolution image into memory
-    let bitmap: ImageBitmap;
-    try {
-      bitmap = await createImageBitmap(file, {
-        resizeWidth: maxWidth,
-        resizeQuality: "medium",
-      });
-    } catch {
-      // Fallback: decode without resize options
-      bitmap = await createImageBitmap(file);
-    }
+  const compressImage = async (file: File, maxWidth = 600, quality = 0.6): Promise<Blob> => {
+    // Use createImageBitmap with resize - this is the ONLY safe path on mobile
+    // It tells the browser to downsample during decode, avoiding full-res in memory
+    const bitmap = await createImageBitmap(file, {
+      resizeWidth: Math.min(maxWidth, 600),
+      resizeQuality: "low",
+    });
 
     const canvas = document.createElement("canvas");
-    let width = bitmap.width;
-    let height = bitmap.height;
-    if (width > maxWidth) {
-      height = Math.round((height * maxWidth) / width);
-      width = maxWidth;
-    }
-    canvas.width = width;
-    canvas.height = height;
+    canvas.width = bitmap.width;
+    canvas.height = bitmap.height;
     const ctx = canvas.getContext("2d");
     if (!ctx) {
       bitmap.close();
       throw new Error("Canvas not supported");
     }
-    ctx.drawImage(bitmap, 0, 0, width, height);
-    bitmap.close(); // Free memory immediately
+    ctx.drawImage(bitmap, 0, 0);
+    bitmap.close();
 
     return new Promise((resolve, reject) => {
       canvas.toBlob(
