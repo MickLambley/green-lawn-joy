@@ -27,6 +27,7 @@ interface PhotoItem {
   fileName: string;
   fileSize: number;
   photoUrl?: string;
+  thumbnailUrl?: string;
   uploading?: boolean;
   uploaded?: boolean;
 }
@@ -133,11 +134,13 @@ const ContractorJobComplete = () => {
 
       for (const photo of existingPhotos) {
         const fileName = photo.photo_url.split("/").pop() || "photo.jpg";
+        const { data: urlData } = supabase.storage.from("job-photos").getPublicUrl(photo.photo_url);
         const item: PhotoItem = {
           id: photo.id,
           fileName,
           fileSize: 0,
           photoUrl: photo.photo_url,
+          thumbnailUrl: urlData.publicUrl,
           uploaded: true,
         };
 
@@ -152,32 +155,47 @@ const ContractorJobComplete = () => {
     setLoading(false);
   };
 
-  const compressImage = (file: File, maxWidth = 1200, quality = 0.7): Promise<Blob> => {
+  const compressImage = async (file: File, maxWidth = 800, quality = 0.65): Promise<Blob> => {
+    // Use createImageBitmap with resize for memory-efficient decoding
+    // This avoids loading the full-resolution image into memory
+    let bitmap: ImageBitmap;
+    try {
+      bitmap = await createImageBitmap(file, {
+        resizeWidth: maxWidth,
+        resizeQuality: "medium",
+      });
+    } catch {
+      // Fallback: decode without resize options
+      bitmap = await createImageBitmap(file);
+    }
+
+    const canvas = document.createElement("canvas");
+    let width = bitmap.width;
+    let height = bitmap.height;
+    if (width > maxWidth) {
+      height = Math.round((height * maxWidth) / width);
+      width = maxWidth;
+    }
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) {
+      bitmap.close();
+      throw new Error("Canvas not supported");
+    }
+    ctx.drawImage(bitmap, 0, 0, width, height);
+    bitmap.close(); // Free memory immediately
+
     return new Promise((resolve, reject) => {
-      const img = new Image();
-      const url = URL.createObjectURL(file);
-      img.onload = () => {
-        URL.revokeObjectURL(url);
-        const canvas = document.createElement("canvas");
-        let width = img.width;
-        let height = img.height;
-        if (width > maxWidth) {
-          height = Math.round((height * maxWidth) / width);
-          width = maxWidth;
-        }
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext("2d");
-        if (!ctx) { reject(new Error("Canvas not supported")); return; }
-        ctx.drawImage(img, 0, 0, width, height);
-        canvas.toBlob(
-          (blob) => { blob ? resolve(blob) : reject(new Error("Compression failed")); },
-          "image/jpeg",
-          quality
-        );
-      };
-      img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("Failed to load image")); };
-      img.src = url;
+      canvas.toBlob(
+        (blob) => {
+          canvas.width = 0;
+          canvas.height = 0;
+          blob ? resolve(blob) : reject(new Error("Compression failed"));
+        },
+        "image/jpeg",
+        quality
+      );
     });
   };
 
@@ -239,14 +257,21 @@ const ContractorJobComplete = () => {
         continue;
       }
 
+      const { data: urlData } = supabase.storage.from("job-photos").getPublicUrl(filePath);
+
       setPhotos((prev) =>
         prev.map((p) =>
           p === item
-            ? { ...p, uploading: false, uploaded: true, photoUrl: filePath }
+            ? { ...p, uploading: false, uploaded: true, photoUrl: filePath, thumbnailUrl: urlData.publicUrl }
             : p
         )
       );
     }
+
+    // Clear file inputs to release file references from memory
+    [beforeCameraRef, beforeGalleryRef, afterCameraRef, afterGalleryRef].forEach(ref => {
+      if (ref.current) ref.current.value = "";
+    });
 
     setUploadProgress(null);
   };
@@ -398,28 +423,34 @@ const ContractorJobComplete = () => {
               Take photos of the lawn <strong>before</strong> you start mowing.
             </p>
 
-            {/* File list */}
-            <div className="space-y-2">
+            {/* Photo thumbnails */}
+            <div className="grid grid-cols-3 gap-2">
               {beforePhotos.map((photo, idx) => (
-                <div key={idx} className="flex items-center gap-3 p-2 rounded-lg border bg-muted/30">
+                <div key={idx} className="relative aspect-square rounded-lg border bg-muted/30 overflow-hidden">
                   {photo.uploading ? (
-                    <Loader2 className="w-5 h-5 animate-spin text-primary shrink-0" />
-                  ) : photo.uploaded ? (
-                    <CheckCircle2 className="w-5 h-5 text-green-500 shrink-0" />
-                  ) : null}
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate">{photo.fileName}</p>
-                    {photo.fileSize > 0 && (
-                      <p className="text-xs text-muted-foreground">
-                        {(photo.fileSize / 1024).toFixed(0)} KB
-                      </p>
-                    )}
-                  </div>
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <Loader2 className="w-6 h-6 animate-spin text-primary" />
+                    </div>
+                  ) : photo.thumbnailUrl ? (
+                    <img
+                      src={photo.thumbnailUrl}
+                      alt={photo.fileName}
+                      className="w-full h-full object-cover"
+                      loading="lazy"
+                    />
+                  ) : (
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <ImageIcon className="w-6 h-6 text-muted-foreground" />
+                    </div>
+                  )}
+                  {photo.uploaded && (
+                    <CheckCircle2 className="absolute top-1 left-1 w-4 h-4 text-primary drop-shadow" />
+                  )}
                   <button
                     onClick={() => handleRemovePhoto(photo, "before")}
-                    className="p-1 rounded-full hover:bg-destructive hover:text-destructive-foreground transition-colors shrink-0"
+                    className="absolute top-1 right-1 p-0.5 rounded-full bg-background/80 hover:bg-destructive hover:text-destructive-foreground transition-colors"
                   >
-                    <X className="w-4 h-4" />
+                    <X className="w-3.5 h-3.5" />
                   </button>
                 </div>
               ))}
@@ -494,27 +525,33 @@ const ContractorJobComplete = () => {
               Take photos of the lawn <strong>after</strong> mowing is complete.
             </p>
 
-            <div className="space-y-2">
+            <div className="grid grid-cols-3 gap-2">
               {afterPhotos.map((photo, idx) => (
-                <div key={idx} className="flex items-center gap-3 p-2 rounded-lg border bg-muted/30">
+                <div key={idx} className="relative aspect-square rounded-lg border bg-muted/30 overflow-hidden">
                   {photo.uploading ? (
-                    <Loader2 className="w-5 h-5 animate-spin text-primary shrink-0" />
-                  ) : photo.uploaded ? (
-                    <CheckCircle2 className="w-5 h-5 text-green-500 shrink-0" />
-                  ) : null}
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate">{photo.fileName}</p>
-                    {photo.fileSize > 0 && (
-                      <p className="text-xs text-muted-foreground">
-                        {(photo.fileSize / 1024).toFixed(0)} KB
-                      </p>
-                    )}
-                  </div>
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <Loader2 className="w-6 h-6 animate-spin text-primary" />
+                    </div>
+                  ) : photo.thumbnailUrl ? (
+                    <img
+                      src={photo.thumbnailUrl}
+                      alt={photo.fileName}
+                      className="w-full h-full object-cover"
+                      loading="lazy"
+                    />
+                  ) : (
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <ImageIcon className="w-6 h-6 text-muted-foreground" />
+                    </div>
+                  )}
+                  {photo.uploaded && (
+                    <CheckCircle2 className="absolute top-1 left-1 w-4 h-4 text-primary drop-shadow" />
+                  )}
                   <button
                     onClick={() => handleRemovePhoto(photo, "after")}
-                    className="p-1 rounded-full hover:bg-destructive hover:text-destructive-foreground transition-colors shrink-0"
+                    className="absolute top-1 right-1 p-0.5 rounded-full bg-background/80 hover:bg-destructive hover:text-destructive-foreground transition-colors"
                   >
-                    <X className="w-4 h-4" />
+                    <X className="w-3.5 h-3.5" />
                   </button>
                 </div>
               ))}
