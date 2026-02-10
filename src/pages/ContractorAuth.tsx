@@ -52,12 +52,31 @@ const ContractorAuth = () => {
             } else {
               navigate("/contractor-onboarding");
             }
-          } else if (isSignUp) {
-            // New signup - redirect to onboarding
-            navigate("/contractor-onboarding");
           } else {
-            toast.error("This account is not registered as a contractor");
-            await supabase.auth.signOut();
+            // User is on the contractor auth page — add contractor role and profile
+            await supabase.from("user_roles").insert({
+              user_id: session.user.id,
+              role: "contractor",
+            });
+
+            const { data: existingContractor } = await supabase
+              .from("contractors")
+              .select("id")
+              .eq("user_id", session.user.id)
+              .single();
+
+            if (!existingContractor) {
+              await supabase.from("contractors").insert({
+                user_id: session.user.id,
+                business_name: null,
+                service_areas: [],
+                is_active: false,
+                approval_status: "pending",
+              });
+            }
+
+            toast.success("Welcome! Please complete your contractor profile.");
+            navigate("/contractor-onboarding");
           }
         }
       }
