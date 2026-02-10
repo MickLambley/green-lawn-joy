@@ -75,6 +75,12 @@ const ContractorDashboard = () => {
   const [viewingJob, setViewingJob] = useState<BookingWithAddress | null>(null);
   const [suggestedDate, setSuggestedDate] = useState<Date | undefined>(undefined);
   const [suggestedTimeSlot, setSuggestedTimeSlot] = useState("10am-2pm");
+  const [stripeStatus, setStripeStatus] = useState<{
+    onboarding_complete: boolean;
+    payouts_enabled: boolean;
+    loading: boolean;
+  }>({ onboarding_complete: false, payouts_enabled: false, loading: true });
+  const [stripeSetupLoading, setStripeSetupLoading] = useState(false);
 
   useEffect(() => {
     checkContractorAccess();
