@@ -249,6 +249,9 @@ export type Database = {
           service_center_lat: number | null
           service_center_lng: number | null
           service_radius_km: number | null
+          stripe_account_id: string | null
+          stripe_onboarding_complete: boolean
+          stripe_payouts_enabled: boolean
           updated_at: string
           user_id: string
         }
@@ -270,6 +273,9 @@ export type Database = {
           service_center_lat?: number | null
           service_center_lng?: number | null
           service_radius_km?: number | null
+          stripe_account_id?: string | null
+          stripe_onboarding_complete?: boolean
+          stripe_payouts_enabled?: boolean
           updated_at?: string
           user_id: string
         }
@@ -291,6 +297,9 @@ export type Database = {
           service_center_lat?: number | null
           service_center_lng?: number | null
           service_radius_km?: number | null
+          stripe_account_id?: string | null
+          stripe_onboarding_complete?: boolean
+          stripe_payouts_enabled?: boolean
           updated_at?: string
           user_id?: string
         }
