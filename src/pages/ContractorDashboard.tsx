@@ -712,7 +712,9 @@ const ContractorDashboard = () => {
                       </TableCell>
                       <TableCell>
                         <div className="flex gap-2">
-                          <Button size="sm" disabled={acceptingJobId === job.id} onClick={(e) => { e.stopPropagation(); handleAcceptJob(job); }}>
+                          <Button size="sm" disabled={acceptingJobId === job.id || !isStripeReady} onClick={(e) => { e.stopPropagation(); handleAcceptJob(job); }}
+                            title={!isStripeReady ? "Complete Stripe payment setup first" : undefined}
+                          >
                             {acceptingJobId === job.id ? (
                               <Loader2 className="w-4 h-4 mr-1 animate-spin" />
                             ) : (
