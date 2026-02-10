@@ -20,6 +20,8 @@ interface IdentityBusinessStepProps {
 export const IdentityBusinessStep = ({ data, onChange, userId, onNext }: IdentityBusinessStepProps) => {
   const [isUploading, setIsUploading] = useState(false);
   const [mapLoaded, setMapLoaded] = useState(false);
+  const dataRef = useRef(data);
+  dataRef.current = data;
   const businessAddressInputRef = useRef<HTMLInputElement>(null);
   const mailingAddressInputRef = useRef<HTMLInputElement>(null);
   const businessAutocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
@@ -63,14 +65,14 @@ export const IdentityBusinessStep = ({ data, onChange, userId, onNext }: Identit
         const address = place.formatted_address || "";
 
         onChange({
-          ...data,
+          ...dataRef.current,
           businessAddress: address,
           businessAddressLat: lat,
           businessAddressLng: lng,
         });
       }
     });
-  }, [mapLoaded, data, onChange]);
+  }, [mapLoaded, onChange]);
 
   // Initialize mailing address autocomplete
   useEffect(() => {
@@ -85,10 +87,10 @@ export const IdentityBusinessStep = ({ data, onChange, userId, onNext }: Identit
       const place = mailingAutocompleteRef.current?.getPlace();
       if (place?.geometry?.location) {
         const address = place.formatted_address || "";
-        onChange({ ...data, mailingAddress: address });
+        onChange({ ...dataRef.current, mailingAddress: address });
       }
     });
-  }, [mapLoaded, data, onChange]);
+  }, [mapLoaded, onChange]);
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
