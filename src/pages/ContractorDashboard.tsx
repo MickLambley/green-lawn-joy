@@ -446,6 +446,59 @@ const ContractorDashboard = () => {
         {/* Only show dashboard content if approved */}
         {!isPendingApproval && !isRejected && (
           <>
+            {/* Stripe Connect Setup */}
+            {!stripeStatus.loading && !stripeStatus.onboarding_complete && (
+              <Card className="mb-8 border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-900/20">
+                <CardContent className="pt-6">
+                  <div className="flex items-start gap-4">
+                    <div className="p-3 rounded-xl bg-amber-100 dark:bg-amber-800/30">
+                      <CreditCard className="w-6 h-6 text-amber-600 dark:text-amber-400" />
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="font-semibold text-amber-800 dark:text-amber-200 mb-1">
+                        Complete Payment Setup
+                      </h3>
+                      <p className="text-amber-700 dark:text-amber-300 text-sm mb-3">
+                        You need to complete your payment setup to receive payouts. Set up your bank account through our secure payment partner.
+                      </p>
+                      <Button
+                        onClick={handleCompleteStripeSetup}
+                        disabled={stripeSetupLoading}
+                        size="sm"
+                      >
+                        {stripeSetupLoading ? (
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        ) : (
+                          <CreditCard className="w-4 h-4 mr-2" />
+                        )}
+                        Complete Setup
+                      </Button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {!stripeStatus.loading && stripeStatus.onboarding_complete && (
+              <Card className="mb-8 border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-900/20">
+                <CardContent className="pt-6">
+                  <div className="flex items-center gap-4">
+                    <div className="p-3 rounded-xl bg-green-100 dark:bg-green-800/30">
+                      <CheckCircle className="w-6 h-6 text-green-600 dark:text-green-400" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-green-800 dark:text-green-200">
+                        Payment Setup Complete ✓
+                      </h3>
+                      <p className="text-green-700 dark:text-green-300 text-sm">
+                        Payouts will be sent to your bank account.
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
             {/* Stats */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
           <Card>
