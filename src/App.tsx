@@ -61,6 +61,11 @@ const App = () => (
               <Settings />
             </ProtectedRoute>
           } />
+          <Route path="/customer/bookings/:id/verify" element={
+            <ProtectedRoute redirectTo="/auth">
+              <CustomerVerifyJob />
+            </ProtectedRoute>
+          } />
           <Route path="/payment-success" element={<PaymentSuccess />} />
           <Route path="/terms" element={<Terms />} />
           <Route path="/privacy" element={<Privacy />} />
