@@ -349,6 +349,7 @@ const BookingDialog = ({ open, onOpenChange, addresses, defaultAddressId, onSucc
         }
 
         setClientSecret(paymentData.clientSecret);
+        onOpenChange(false); // Close booking dialog before opening payment
         setPaymentDialogOpen(true);
       }
     } catch (error) {
@@ -700,20 +701,21 @@ const BookingDialog = ({ open, onOpenChange, addresses, defaultAddressId, onSucc
           )}
         </DialogContent>
 
-        {/* Payment Dialog */}
-        <PaymentDialog
-          open={paymentDialogOpen}
-          onOpenChange={handlePaymentDialogClose}
-          amount={totalWithGst}
-          onPaymentSuccess={handlePaymentSuccess}
-          clientSecret={clientSecret}
-          bookingDetails={{
-            date: selectedDate?.toLocaleDateString("en-AU", { weekday: "long", month: "long", day: "numeric" }) || "",
-            timeSlot: timeSlots.find(s => s.value === timeSlot)?.label || timeSlot,
-            address: selectedAddress ? `${selectedAddress.street_address}, ${selectedAddress.city}` : "",
-          }}
-        />
       </Dialog>
+
+      {/* Payment Dialog - rendered outside BookingDialog to avoid nested dialog focus trap issues */}
+      <PaymentDialog
+        open={paymentDialogOpen}
+        onOpenChange={handlePaymentDialogClose}
+        amount={totalWithGst}
+        onPaymentSuccess={handlePaymentSuccess}
+        clientSecret={clientSecret}
+        bookingDetails={{
+          date: selectedDate?.toLocaleDateString("en-AU", { weekday: "long", month: "long", day: "numeric" }) || "",
+          timeSlot: timeSlots.find(s => s.value === timeSlot)?.label || timeSlot,
+          address: selectedAddress ? `${selectedAddress.street_address}, ${selectedAddress.city}` : "",
+        }}
+      />
 
       {/* Add Address Dialog */}
       <AddAddressDialog
