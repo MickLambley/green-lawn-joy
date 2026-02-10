@@ -109,10 +109,14 @@ serve(async (req) => {
 
     // Notify contractor
     if (contractor) {
+      const notifMessage = isPostPayment
+        ? `${customerName} has raised an issue with Job #${bookingId.slice(0, 8)} after payment was released. This may result in a partial refund. Please respond within 24 hours.`
+        : `${customerName} has raised an issue with Job #${bookingId.slice(0, 8)}. Please respond within 24 hours.`;
+
       await supabase.from("notifications").insert({
         user_id: contractor.user_id,
-        title: "Issue Reported ⚠️",
-        message: `${customerName} has raised an issue with Job #${bookingId.slice(0, 8)}. Please respond within 24 hours.`,
+        title: isPostPayment ? "Post-Payment Issue Reported ⚠️" : "Issue Reported ⚠️",
+        message: notifMessage,
         type: "warning",
         booking_id: bookingId,
       });
