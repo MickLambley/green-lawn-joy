@@ -158,12 +158,33 @@ const ContractorJobComplete = () => {
   };
 
   const compressImage = async (file: File, maxWidth = 600, quality = 0.6): Promise<Blob> => {
-    // Use createImageBitmap with resize - this is the ONLY safe path on mobile
-    // It tells the browser to downsample during decode, avoiding full-res in memory
-    const bitmap = await createImageBitmap(file, {
-      resizeWidth: Math.min(maxWidth, 600),
-      resizeQuality: "low",
+    photoLogger.info("compressImage START", {
+      fileName: file.name,
+      fileSize: `${(file.size / 1024 / 1024).toFixed(2)}MB`,
+      fileType: file.type,
+      maxWidth,
+      quality,
     });
+
+    let bitmap: ImageBitmap | null = null;
+    try {
+      photoLogger.info("Creating ImageBitmap with resize...");
+      bitmap = await createImageBitmap(file, {
+        resizeWidth: Math.min(maxWidth, 600),
+        resizeQuality: "low",
+      });
+      photoLogger.info("ImageBitmap created", {
+        bitmapWidth: bitmap.width,
+        bitmapHeight: bitmap.height,
+      });
+    } catch (err: any) {
+      photoLogger.error("createImageBitmap FAILED", {
+        error: err?.message || String(err),
+        fileName: file.name,
+        fileSize: `${(file.size / 1024 / 1024).toFixed(2)}MB`,
+      });
+      throw new Error(`Image decode failed: ${err?.message || "unknown"}`);
+    }
 
     const canvas = document.createElement("canvas");
     canvas.width = bitmap.width;
@@ -171,17 +192,35 @@ const ContractorJobComplete = () => {
     const ctx = canvas.getContext("2d");
     if (!ctx) {
       bitmap.close();
+      photoLogger.error("Canvas 2D context not available");
       throw new Error("Canvas not supported");
     }
-    ctx.drawImage(bitmap, 0, 0);
-    bitmap.close();
+
+    try {
+      ctx.drawImage(bitmap, 0, 0);
+      photoLogger.info("Drew bitmap to canvas");
+    } catch (err: any) {
+      photoLogger.error("drawImage FAILED", { error: err?.message || String(err) });
+      throw err;
+    } finally {
+      bitmap.close();
+      photoLogger.info("Bitmap closed");
+    }
 
     return new Promise((resolve, reject) => {
       canvas.toBlob(
         (blob) => {
           canvas.width = 0;
           canvas.height = 0;
-          blob ? resolve(blob) : reject(new Error("Compression failed"));
+          if (blob) {
+            photoLogger.info("compressImage DONE", {
+              outputSize: `${(blob.size / 1024).toFixed(1)}KB`,
+            });
+            resolve(blob);
+          } else {
+            photoLogger.error("canvas.toBlob returned null");
+            reject(new Error("Compression failed"));
+          }
         },
         "image/jpeg",
         quality
