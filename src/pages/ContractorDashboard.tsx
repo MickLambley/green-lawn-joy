@@ -258,6 +258,27 @@ const ContractorDashboard = () => {
   const handleAcceptJob = async (booking: BookingWithAddress) => {
     if (!contractor) return;
 
+    // Tier-based restrictions
+    const tier = (contractor as any).tier || "probation";
+    const activeJobCount = myJobs.filter(j => j.status === "confirmed" || j.status === "pending").length;
+
+    if (tier === "probation") {
+      if (activeJobCount >= 3) {
+        toast.error("You've reached your maximum of 3 concurrent jobs for your tier. Complete existing jobs to accept new ones.");
+        return;
+      }
+      if (booking.total_price && Number(booking.total_price) > 150) {
+        toast.error("As a new contractor, you cannot accept jobs over $150. Complete more jobs to unlock higher-value work.");
+        return;
+      }
+    } else if (tier === "standard") {
+      if (activeJobCount >= 10) {
+        toast.error("You've reached your maximum of 10 concurrent jobs for your tier. Complete existing jobs to accept new ones.");
+        return;
+      }
+    }
+    // Premium: no restrictions
+
     setAcceptingJobId(booking.id);
     try {
       const { data, error } = await supabase.functions.invoke("charge-customer", {
