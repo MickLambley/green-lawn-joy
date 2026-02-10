@@ -249,38 +249,85 @@ const ContractorJobComplete = () => {
     });
   };
 
-  const handleFileSelect = async (
+  /**
+   * Deferred file handler — uses setTimeout(0) to let the browser
+   * finish the camera intent before we touch the file data.
+   * This prevents OOM crashes on mobile where the browser is still
+   * holding camera resources when onChange fires.
+   */
+  const handleFileSelect = (
     files: FileList | null,
     type: "before" | "after"
   ) => {
-    if (!files || !bookingId || !contractor || files.length === 0) return;
+    photoLogger.info("onChange FIRED", { type, hasFiles: !!files, fileCount: files?.length ?? 0 });
 
-    const setPhotos = type === "before" ? setBeforePhotos : setAfterPhotos;
-    const fileArray = Array.from(files);
-    const total = fileArray.length;
+    if (!files || !bookingId || !contractor || files.length === 0) {
+      photoLogger.warn("handleFileSelect: no files or missing context");
+      return;
+    }
 
-    photoLogger.info("handleFileSelect START", {
-      type,
-      fileCount: total,
-      files: fileArray.map((f) => ({ name: f.name, size: `${(f.size / 1024 / 1024).toFixed(2)}MB`, type: f.type })),
+    // Copy file references immediately (FileList can become invalid)
+    const fileArray: File[] = [];
+    for (let i = 0; i < files.length; i++) {
+      fileArray.push(files[i]);
+    }
+
+    photoLogger.info("Files copied from FileList", {
+      count: fileArray.length,
+      files: fileArray.map((f) => ({
+        name: f.name,
+        size: `${(f.size / 1024 / 1024).toFixed(2)}MB`,
+        type: f.type,
+      })),
     });
 
+    // Clear file inputs IMMEDIATELY to release camera file handles
+    [beforeCameraRef, beforeGalleryRef, afterCameraRef, afterGalleryRef].forEach(ref => {
+      if (ref.current) ref.current.value = "";
+    });
+    photoLogger.info("File inputs cleared");
+
+    // Defer processing to next tick — gives browser time to free camera resources
+    setTimeout(() => {
+      processFiles(fileArray, type);
+    }, 100);
+  };
+
+  const processFiles = async (fileArray: File[], type: "before" | "after") => {
+    const setPhotos = type === "before" ? setBeforePhotos : setAfterPhotos;
+    const total = fileArray.length;
+
+    photoLogger.info("processFiles START (deferred)", { type, total });
     setUploadProgress({ active: true, type, current: 0, total });
 
     for (let i = 0; i < fileArray.length; i++) {
       const file = fileArray[i];
-      photoLogger.info(`Processing file ${i + 1}/${total}`, { name: file.name, size: `${(file.size / 1024 / 1024).toFixed(2)}MB` });
+      photoLogger.info(`Processing file ${i + 1}/${total}`, {
+        name: file.name,
+        size: `${(file.size / 1024 / 1024).toFixed(2)}MB`,
+      });
       setUploadProgress({ active: true, type, current: i + 1, total });
 
-      // Compress image
+      // Small delay between files to let GC run
+      if (i > 0) {
+        await new Promise(r => setTimeout(r, 200));
+        photoLogger.info("Inter-file GC pause done");
+      }
+
       let compressed: Blob;
       try {
         compressed = await compressImage(file);
       } catch (err: any) {
-        photoLogger.error(`Compression failed for file ${i + 1}/${total}`, { error: err?.message || String(err), fileName: file.name });
+        photoLogger.error(`Compression failed for file ${i + 1}/${total}`, {
+          error: err?.message || String(err),
+          fileName: file.name,
+        });
         toast.error(`Failed to process photo ${i + 1} of ${total}. Skipping.`);
         continue;
       }
+
+      // Release reference to original file ASAP
+      (fileArray as any)[i] = null;
 
       const item: PhotoItem = {
         fileName: file.name,
@@ -293,7 +340,11 @@ const ContractorJobComplete = () => {
       const timestamp = Date.now();
       const filePath = `${bookingId}/${type}-${timestamp}-${Math.random().toString(36).slice(2, 8)}.jpg`;
 
-      photoLogger.info("Uploading to storage...", { filePath, compressedSize: `${(compressed.size / 1024).toFixed(1)}KB` });
+      photoLogger.info("Uploading to storage...", {
+        filePath,
+        compressedSize: `${(compressed.size / 1024).toFixed(1)}KB`,
+      });
+
       const { error: uploadError } = await supabase.storage
         .from("job-photos")
         .upload(filePath, compressed, { contentType: "image/jpeg" });
@@ -319,7 +370,9 @@ const ContractorJobComplete = () => {
         continue;
       }
 
-      const { data: signedData } = await supabase.storage.from("job-photos").createSignedUrl(filePath, 3600);
+      const { data: signedData } = await supabase.storage
+        .from("job-photos")
+        .createSignedUrl(filePath, 3600);
 
       setPhotos((prev) =>
         prev.map((p) =>
@@ -331,12 +384,7 @@ const ContractorJobComplete = () => {
       photoLogger.info(`File ${i + 1}/${total} complete`);
     }
 
-    // Clear file inputs to release file references from memory
-    [beforeCameraRef, beforeGalleryRef, afterCameraRef, afterGalleryRef].forEach(ref => {
-      if (ref.current) ref.current.value = "";
-    });
-
-    photoLogger.info("handleFileSelect DONE", { type, totalProcessed: total });
+    photoLogger.info("processFiles DONE", { type, totalProcessed: total });
     setUploadProgress(null);
   };
 
