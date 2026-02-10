@@ -671,9 +671,13 @@ const ContractorDashboard = () => {
                       </TableCell>
                       <TableCell>
                         <div className="flex gap-2">
-                          <Button size="sm" onClick={(e) => { e.stopPropagation(); handleAcceptJob(job); }}>
-                            <Check className="w-4 h-4 mr-1" />
-                            Accept
+                          <Button size="sm" disabled={acceptingJobId === job.id} onClick={(e) => { e.stopPropagation(); handleAcceptJob(job); }}>
+                            {acceptingJobId === job.id ? (
+                              <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                            ) : (
+                              <Check className="w-4 h-4 mr-1" />
+                            )}
+                            {acceptingJobId === job.id ? "Processing..." : "Accept"}
                           </Button>
                           <Button
                             size="sm"
