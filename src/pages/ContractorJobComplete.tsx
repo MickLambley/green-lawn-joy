@@ -263,10 +263,6 @@ const ContractorJobComplete = () => {
       }
     }
 
-    if (photo.previewUrl && photo.file) {
-      URL.revokeObjectURL(photo.previewUrl);
-    }
-
     setPhotos((prev) => prev.filter((p) => p !== photo));
   };
 
