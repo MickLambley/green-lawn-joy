@@ -21,6 +21,8 @@ import {
   AlertCircle,
 } from "lucide-react";
 import { toast } from "sonner";
+import { photoLogger } from "@/lib/photoDebugLogger";
+import { Download } from "lucide-react";
 
 interface PhotoItem {
   id?: string;
@@ -156,12 +158,33 @@ const ContractorJobComplete = () => {
   };
 
   const compressImage = async (file: File, maxWidth = 600, quality = 0.6): Promise<Blob> => {
-    // Use createImageBitmap with resize - this is the ONLY safe path on mobile
-    // It tells the browser to downsample during decode, avoiding full-res in memory
-    const bitmap = await createImageBitmap(file, {
-      resizeWidth: Math.min(maxWidth, 600),
-      resizeQuality: "low",
+    photoLogger.info("compressImage START", {
+      fileName: file.name,
+      fileSize: `${(file.size / 1024 / 1024).toFixed(2)}MB`,
+      fileType: file.type,
+      maxWidth,
+      quality,
     });
+
+    let bitmap: ImageBitmap | null = null;
+    try {
+      photoLogger.info("Creating ImageBitmap with resize...");
+      bitmap = await createImageBitmap(file, {
+        resizeWidth: Math.min(maxWidth, 600),
+        resizeQuality: "low",
+      });
+      photoLogger.info("ImageBitmap created", {
+        bitmapWidth: bitmap.width,
+        bitmapHeight: bitmap.height,
+      });
+    } catch (err: any) {
+      photoLogger.error("createImageBitmap FAILED", {
+        error: err?.message || String(err),
+        fileName: file.name,
+        fileSize: `${(file.size / 1024 / 1024).toFixed(2)}MB`,
+      });
+      throw new Error(`Image decode failed: ${err?.message || "unknown"}`);
+    }
 
     const canvas = document.createElement("canvas");
     canvas.width = bitmap.width;
@@ -169,17 +192,35 @@ const ContractorJobComplete = () => {
     const ctx = canvas.getContext("2d");
     if (!ctx) {
       bitmap.close();
+      photoLogger.error("Canvas 2D context not available");
       throw new Error("Canvas not supported");
     }
-    ctx.drawImage(bitmap, 0, 0);
-    bitmap.close();
+
+    try {
+      ctx.drawImage(bitmap, 0, 0);
+      photoLogger.info("Drew bitmap to canvas");
+    } catch (err: any) {
+      photoLogger.error("drawImage FAILED", { error: err?.message || String(err) });
+      throw err;
+    } finally {
+      bitmap.close();
+      photoLogger.info("Bitmap closed");
+    }
 
     return new Promise((resolve, reject) => {
       canvas.toBlob(
         (blob) => {
           canvas.width = 0;
           canvas.height = 0;
-          blob ? resolve(blob) : reject(new Error("Compression failed"));
+          if (blob) {
+            photoLogger.info("compressImage DONE", {
+              outputSize: `${(blob.size / 1024).toFixed(1)}KB`,
+            });
+            resolve(blob);
+          } else {
+            photoLogger.error("canvas.toBlob returned null");
+            reject(new Error("Compression failed"));
+          }
         },
         "image/jpeg",
         quality
@@ -197,17 +238,25 @@ const ContractorJobComplete = () => {
     const fileArray = Array.from(files);
     const total = fileArray.length;
 
+    photoLogger.info("handleFileSelect START", {
+      type,
+      fileCount: total,
+      files: fileArray.map((f) => ({ name: f.name, size: `${(f.size / 1024 / 1024).toFixed(2)}MB`, type: f.type })),
+    });
+
     setUploadProgress({ active: true, type, current: 0, total });
 
     for (let i = 0; i < fileArray.length; i++) {
       const file = fileArray[i];
+      photoLogger.info(`Processing file ${i + 1}/${total}`, { name: file.name, size: `${(file.size / 1024 / 1024).toFixed(2)}MB` });
       setUploadProgress({ active: true, type, current: i + 1, total });
 
       // Compress image
       let compressed: Blob;
       try {
         compressed = await compressImage(file);
-      } catch {
+      } catch (err: any) {
+        photoLogger.error(`Compression failed for file ${i + 1}/${total}`, { error: err?.message || String(err), fileName: file.name });
         toast.error(`Failed to process photo ${i + 1} of ${total}. Skipping.`);
         continue;
       }
@@ -223,16 +272,19 @@ const ContractorJobComplete = () => {
       const timestamp = Date.now();
       const filePath = `${bookingId}/${type}-${timestamp}-${Math.random().toString(36).slice(2, 8)}.jpg`;
 
+      photoLogger.info("Uploading to storage...", { filePath, compressedSize: `${(compressed.size / 1024).toFixed(1)}KB` });
       const { error: uploadError } = await supabase.storage
         .from("job-photos")
         .upload(filePath, compressed, { contentType: "image/jpeg" });
 
       if (uploadError) {
+        photoLogger.error("Storage upload failed", { error: uploadError.message, filePath });
         toast.error(`Photo ${i + 1} of ${total} failed: ${uploadError.message}`);
         setPhotos((prev) => prev.filter((p) => p !== item));
         continue;
       }
 
+      photoLogger.info("Inserting DB record...");
       const { error: dbError } = await supabase.from("job_photos").insert({
         booking_id: bookingId,
         contractor_id: contractor.id,
@@ -241,6 +293,7 @@ const ContractorJobComplete = () => {
       });
 
       if (dbError) {
+        photoLogger.error("DB insert failed", { error: dbError.message });
         toast.error(`Photo ${i + 1} record failed: ${dbError.message}`);
         continue;
       }
@@ -254,6 +307,7 @@ const ContractorJobComplete = () => {
             : p
         )
       );
+      photoLogger.info(`File ${i + 1}/${total} complete`);
     }
 
     // Clear file inputs to release file references from memory
@@ -261,6 +315,7 @@ const ContractorJobComplete = () => {
       if (ref.current) ref.current.value = "";
     });
 
+    photoLogger.info("handleFileSelect DONE", { type, totalProcessed: total });
     setUploadProgress(null);
   };
 
@@ -351,6 +406,18 @@ const ContractorJobComplete = () => {
       </header>
 
       <main className="container mx-auto px-4 py-8 max-w-2xl space-y-6">
+        {/* Debug Log Download */}
+        <div className="flex justify-end">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-xs text-muted-foreground"
+            onClick={() => photoLogger.downloadLogs()}
+          >
+            <Download className="w-3 h-3 mr-1" />
+            Download Debug Logs
+          </Button>
+        </div>
         {/* Job Summary */}
         <Card>
           <CardHeader>
