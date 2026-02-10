@@ -349,6 +349,7 @@ const BookingDialog = ({ open, onOpenChange, addresses, defaultAddressId, onSucc
         }
 
         setClientSecret(paymentData.clientSecret);
+        onOpenChange(false); // Close booking dialog before opening payment
         setPaymentDialogOpen(true);
       }
     } catch (error) {
