@@ -238,17 +238,25 @@ const ContractorJobComplete = () => {
     const fileArray = Array.from(files);
     const total = fileArray.length;
 
+    photoLogger.info("handleFileSelect START", {
+      type,
+      fileCount: total,
+      files: fileArray.map((f) => ({ name: f.name, size: `${(f.size / 1024 / 1024).toFixed(2)}MB`, type: f.type })),
+    });
+
     setUploadProgress({ active: true, type, current: 0, total });
 
     for (let i = 0; i < fileArray.length; i++) {
       const file = fileArray[i];
+      photoLogger.info(`Processing file ${i + 1}/${total}`, { name: file.name, size: `${(file.size / 1024 / 1024).toFixed(2)}MB` });
       setUploadProgress({ active: true, type, current: i + 1, total });
 
       // Compress image
       let compressed: Blob;
       try {
         compressed = await compressImage(file);
-      } catch {
+      } catch (err: any) {
+        photoLogger.error(`Compression failed for file ${i + 1}/${total}`, { error: err?.message || String(err), fileName: file.name });
         toast.error(`Failed to process photo ${i + 1} of ${total}. Skipping.`);
         continue;
       }
