@@ -55,8 +55,10 @@ const ContractorJobComplete = () => {
     total: number;
   } | null>(null);
 
-  const beforeInputRef = useRef<HTMLInputElement>(null);
-  const afterInputRef = useRef<HTMLInputElement>(null);
+  const beforeCameraRef = useRef<HTMLInputElement>(null);
+  const beforeGalleryRef = useRef<HTMLInputElement>(null);
+  const afterCameraRef = useRef<HTMLInputElement>(null);
+  const afterGalleryRef = useRef<HTMLInputElement>(null);
 
   const minPhotos = contractorTier === "probation" ? 2 : 1;
 
@@ -423,14 +425,24 @@ const ContractorJobComplete = () => {
               ))}
             </div>
 
-            <Button
-              variant="outline"
-              className="w-full"
-              onClick={() => beforeInputRef.current?.click()}
-            >
-              <Camera className="w-4 h-4 mr-2" />
-              Add Photos
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={() => beforeCameraRef.current?.click()}
+              >
+                <Camera className="w-4 h-4 mr-2" />
+                Take Photo
+              </Button>
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={() => beforeGalleryRef.current?.click()}
+              >
+                <ImageIcon className="w-4 h-4 mr-2" />
+                Gallery
+              </Button>
+            </div>
 
             {uploadProgress?.active && uploadProgress.type === "before" && (
               <div className="space-y-2 p-3 rounded-lg bg-muted/50 border">
@@ -443,7 +455,15 @@ const ContractorJobComplete = () => {
             )}
 
             <input
-              ref={beforeInputRef}
+              ref={beforeCameraRef}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              className="hidden"
+              onChange={(e) => handleFileSelect(e.target.files, "before")}
+            />
+            <input
+              ref={beforeGalleryRef}
               type="file"
               accept="image/*"
               multiple
@@ -500,14 +520,24 @@ const ContractorJobComplete = () => {
               ))}
             </div>
 
-            <Button
-              variant="outline"
-              className="w-full"
-              onClick={() => afterInputRef.current?.click()}
-            >
-              <Camera className="w-4 h-4 mr-2" />
-              Add Photos
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={() => afterCameraRef.current?.click()}
+              >
+                <Camera className="w-4 h-4 mr-2" />
+                Take Photo
+              </Button>
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={() => afterGalleryRef.current?.click()}
+              >
+                <ImageIcon className="w-4 h-4 mr-2" />
+                Gallery
+              </Button>
+            </div>
 
             {uploadProgress?.active && uploadProgress.type === "after" && (
               <div className="space-y-2 p-3 rounded-lg bg-muted/50 border">
@@ -520,7 +550,15 @@ const ContractorJobComplete = () => {
             )}
 
             <input
-              ref={afterInputRef}
+              ref={afterCameraRef}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              className="hidden"
+              onChange={(e) => handleFileSelect(e.target.files, "after")}
+            />
+            <input
+              ref={afterGalleryRef}
               type="file"
               accept="image/*"
               multiple
