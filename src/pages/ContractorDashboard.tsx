@@ -336,8 +336,12 @@ const ContractorDashboard = () => {
   };
 
   const handleSuggestAlternative = async () => {
-    if (!contractor || !selectedJob || !suggestedDate) return;
+    if (!isStripeReady) {
+      toast.error("You must complete your Stripe payment setup before suggesting times. Use the 'Complete Payment Setup' button above.");
+      return;
+    }
 
+    if (!contractor || !selectedJob || !suggestedDate) return;
     try {
       // Insert into alternative_suggestions table
       const { error: suggestionError } = await supabase
