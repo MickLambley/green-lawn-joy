@@ -9,7 +9,6 @@ import { Progress } from "@/components/ui/progress";
 import {
   Leaf,
   Camera,
-  Upload,
   X,
   Check,
   Loader2,
@@ -25,8 +24,8 @@ import { toast } from "sonner";
 
 interface PhotoItem {
   id?: string;
-  file?: File;
-  previewUrl: string;
+  fileName: string;
+  fileSize: number;
   photoUrl?: string;
   uploading?: boolean;
   uploaded?: boolean;
@@ -131,13 +130,11 @@ const ContractorJobComplete = () => {
       const afters: PhotoItem[] = [];
 
       for (const photo of existingPhotos) {
-        const { data: signedData } = await supabase.storage
-          .from("job-photos")
-          .createSignedUrl(photo.photo_url, 3600);
-
+        const fileName = photo.photo_url.split("/").pop() || "photo.jpg";
         const item: PhotoItem = {
           id: photo.id,
-          previewUrl: signedData?.signedUrl || "",
+          fileName,
+          fileSize: 0,
           photoUrl: photo.photo_url,
           uploaded: true,
         };
@@ -207,10 +204,9 @@ const ContractorJobComplete = () => {
         continue;
       }
 
-      const previewUrl = URL.createObjectURL(compressed);
       const item: PhotoItem = {
-        file: new File([compressed], file.name, { type: "image/jpeg" }),
-        previewUrl,
+        fileName: file.name,
+        fileSize: compressed.size,
         uploading: true,
       };
 
@@ -225,7 +221,6 @@ const ContractorJobComplete = () => {
 
       if (uploadError) {
         toast.error(`Photo ${i + 1} of ${total} failed: ${uploadError.message}`);
-        URL.revokeObjectURL(previewUrl);
         setPhotos((prev) => prev.filter((p) => p !== item));
         continue;
       }
@@ -265,10 +260,6 @@ const ContractorJobComplete = () => {
       if (photo.id) {
         await supabase.from("job_photos").delete().eq("id", photo.id);
       }
-    }
-
-    if (photo.previewUrl && photo.file) {
-      URL.revokeObjectURL(photo.previewUrl);
     }
 
     setPhotos((prev) => prev.filter((p) => p !== photo));
@@ -405,43 +396,41 @@ const ContractorJobComplete = () => {
               Take photos of the lawn <strong>before</strong> you start mowing.
             </p>
 
-            {/* Photo grid */}
-            <div className="grid grid-cols-3 gap-3">
+            {/* File list */}
+            <div className="space-y-2">
               {beforePhotos.map((photo, idx) => (
-                <div key={idx} className="relative aspect-square rounded-lg overflow-hidden border bg-muted">
-                  <img
-                    src={photo.previewUrl}
-                    alt={`Before ${idx + 1}`}
-                    className="w-full h-full object-cover"
-                  />
-                  {photo.uploading && (
-                    <div className="absolute inset-0 bg-background/60 flex items-center justify-center">
-                      <Loader2 className="w-5 h-5 animate-spin text-primary" />
-                    </div>
-                  )}
-                  {photo.uploaded && (
-                    <div className="absolute top-1 left-1">
-                      <CheckCircle2 className="w-5 h-5 text-green-500 drop-shadow" />
-                    </div>
-                  )}
+                <div key={idx} className="flex items-center gap-3 p-2 rounded-lg border bg-muted/30">
+                  {photo.uploading ? (
+                    <Loader2 className="w-5 h-5 animate-spin text-primary shrink-0" />
+                  ) : photo.uploaded ? (
+                    <CheckCircle2 className="w-5 h-5 text-green-500 shrink-0" />
+                  ) : null}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate">{photo.fileName}</p>
+                    {photo.fileSize > 0 && (
+                      <p className="text-xs text-muted-foreground">
+                        {(photo.fileSize / 1024).toFixed(0)} KB
+                      </p>
+                    )}
+                  </div>
                   <button
                     onClick={() => handleRemovePhoto(photo, "before")}
-                    className="absolute top-1 right-1 p-1 rounded-full bg-background/80 hover:bg-destructive hover:text-destructive-foreground transition-colors"
+                    className="p-1 rounded-full hover:bg-destructive hover:text-destructive-foreground transition-colors shrink-0"
                   >
-                    <X className="w-3 h-3" />
+                    <X className="w-4 h-4" />
                   </button>
                 </div>
               ))}
-
-              {/* Upload button */}
-              <button
-                onClick={() => beforeInputRef.current?.click()}
-                className="aspect-square rounded-lg border-2 border-dashed border-muted-foreground/30 flex flex-col items-center justify-center gap-1 hover:border-primary/50 hover:bg-primary/5 transition-colors"
-              >
-                <Camera className="w-6 h-6 text-muted-foreground" />
-                <span className="text-xs text-muted-foreground">Add</span>
-              </button>
             </div>
+
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={() => beforeInputRef.current?.click()}
+            >
+              <Camera className="w-4 h-4 mr-2" />
+              Add Photos
+            </Button>
 
             {uploadProgress?.active && uploadProgress.type === "before" && (
               <div className="space-y-2 p-3 rounded-lg bg-muted/50 border">
@@ -486,41 +475,40 @@ const ContractorJobComplete = () => {
               Take photos of the lawn <strong>after</strong> mowing is complete.
             </p>
 
-            <div className="grid grid-cols-3 gap-3">
+            <div className="space-y-2">
               {afterPhotos.map((photo, idx) => (
-                <div key={idx} className="relative aspect-square rounded-lg overflow-hidden border bg-muted">
-                  <img
-                    src={photo.previewUrl}
-                    alt={`After ${idx + 1}`}
-                    className="w-full h-full object-cover"
-                  />
-                  {photo.uploading && (
-                    <div className="absolute inset-0 bg-background/60 flex items-center justify-center">
-                      <Loader2 className="w-5 h-5 animate-spin text-primary" />
-                    </div>
-                  )}
-                  {photo.uploaded && (
-                    <div className="absolute top-1 left-1">
-                      <CheckCircle2 className="w-5 h-5 text-green-500 drop-shadow" />
-                    </div>
-                  )}
+                <div key={idx} className="flex items-center gap-3 p-2 rounded-lg border bg-muted/30">
+                  {photo.uploading ? (
+                    <Loader2 className="w-5 h-5 animate-spin text-primary shrink-0" />
+                  ) : photo.uploaded ? (
+                    <CheckCircle2 className="w-5 h-5 text-green-500 shrink-0" />
+                  ) : null}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate">{photo.fileName}</p>
+                    {photo.fileSize > 0 && (
+                      <p className="text-xs text-muted-foreground">
+                        {(photo.fileSize / 1024).toFixed(0)} KB
+                      </p>
+                    )}
+                  </div>
                   <button
                     onClick={() => handleRemovePhoto(photo, "after")}
-                    className="absolute top-1 right-1 p-1 rounded-full bg-background/80 hover:bg-destructive hover:text-destructive-foreground transition-colors"
+                    className="p-1 rounded-full hover:bg-destructive hover:text-destructive-foreground transition-colors shrink-0"
                   >
-                    <X className="w-3 h-3" />
+                    <X className="w-4 h-4" />
                   </button>
                 </div>
               ))}
-
-              <button
-                onClick={() => afterInputRef.current?.click()}
-                className="aspect-square rounded-lg border-2 border-dashed border-muted-foreground/30 flex flex-col items-center justify-center gap-1 hover:border-primary/50 hover:bg-primary/5 transition-colors"
-              >
-                <Camera className="w-6 h-6 text-muted-foreground" />
-                <span className="text-xs text-muted-foreground">Add</span>
-              </button>
             </div>
+
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={() => afterInputRef.current?.click()}
+            >
+              <Camera className="w-4 h-4 mr-2" />
+              Add Photos
+            </Button>
 
             {uploadProgress?.active && uploadProgress.type === "after" && (
               <div className="space-y-2 p-3 rounded-lg bg-muted/50 border">
