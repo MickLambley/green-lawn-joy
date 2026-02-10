@@ -442,6 +442,16 @@ const ContractorJobComplete = () => {
               </button>
             </div>
 
+            {uploadProgress?.active && uploadProgress.type === "before" && (
+              <div className="space-y-2 p-3 rounded-lg bg-muted/50 border">
+                <div className="flex items-center gap-2 text-sm font-medium">
+                  <Loader2 className="w-4 h-4 animate-spin text-primary" />
+                  <span>Uploading photo {uploadProgress.current} of {uploadProgress.total}...</span>
+                </div>
+                <Progress value={(uploadProgress.current / uploadProgress.total) * 100} className="h-2" />
+              </div>
+            )}
+
             <input
               ref={beforeInputRef}
               type="file"
