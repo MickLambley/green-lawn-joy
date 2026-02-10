@@ -123,6 +123,7 @@ const BookingDialog = ({ open, onOpenChange, addresses, defaultAddressId, onSucc
     if (open) {
       fetchPricingSettings();
       setStep("form");
+      setAgreedToTerms(false);
       setQuote(null);
       
       if (editingBooking) {
