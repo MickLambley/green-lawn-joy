@@ -12,6 +12,7 @@ import ContractorOnboarding from "./pages/ContractorOnboarding";
 import Dashboard from "./pages/Dashboard";
 import Admin from "./pages/Admin";
 import ContractorDashboard from "./pages/ContractorDashboard";
+import ContractorJobComplete from "./pages/ContractorJobComplete";
 import PaymentSuccess from "./pages/PaymentSuccess";
 import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
@@ -47,6 +48,11 @@ const App = () => (
           <Route path="/contractor" element={
             <ProtectedRoute requiredRole="contractor" redirectTo="/dashboard">
               <ContractorDashboard />
+            </ProtectedRoute>
+          } />
+          <Route path="/contractor/jobs/:id/complete" element={
+            <ProtectedRoute requiredRole="contractor" redirectTo="/dashboard">
+              <ContractorJobComplete />
             </ProtectedRoute>
           } />
           <Route path="/settings" element={
