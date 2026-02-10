@@ -134,13 +134,13 @@ const ContractorJobComplete = () => {
 
       for (const photo of existingPhotos) {
         const fileName = photo.photo_url.split("/").pop() || "photo.jpg";
-        const { data: urlData } = supabase.storage.from("job-photos").getPublicUrl(photo.photo_url);
+        const { data: signedData } = await supabase.storage.from("job-photos").createSignedUrl(photo.photo_url, 3600);
         const item: PhotoItem = {
           id: photo.id,
           fileName,
           fileSize: 0,
           photoUrl: photo.photo_url,
-          thumbnailUrl: urlData.publicUrl,
+          thumbnailUrl: signedData?.signedUrl || undefined,
           uploaded: true,
         };
 
