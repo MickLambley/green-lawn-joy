@@ -41,15 +41,28 @@ serve(async (req) => {
     // Fetch booking
     const { data: booking, error: bookingError } = await supabase
       .from("bookings")
-      .select("id, user_id, contractor_id, status, total_price, address_id")
+      .select("id, user_id, contractor_id, status, total_price, address_id, payout_status, completed_at")
       .eq("id", bookingId)
       .single();
 
     if (bookingError || !booking) throw new Error("Booking not found");
     if (booking.user_id !== userId) throw new Error("Not your booking");
-    if (booking.status !== "completed_pending_verification") throw new Error("Booking is not awaiting verification");
 
-    logStep("Booking verified", { bookingId });
+    // Determine if this is a post-payment dispute
+    const isPostPayment = booking.status === "completed" && booking.payout_status === "released";
+    const isPrePayment = booking.status === "completed_pending_verification";
+
+    if (!isPrePayment && !isPostPayment) throw new Error("Booking is not eligible for dispute");
+
+    // For post-payment disputes, verify within 7-day window
+    if (isPostPayment) {
+      if (!booking.completed_at) throw new Error("Booking has no completion date");
+      const completedAt = new Date(booking.completed_at).getTime();
+      const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
+      if (Date.now() - completedAt >= sevenDaysMs) throw new Error("The 7-day dispute window has expired");
+    }
+
+    logStep("Booking verified", { bookingId, isPostPayment });
 
     // Create dispute
     const { error: disputeError } = await supabase
@@ -64,17 +77,18 @@ serve(async (req) => {
     if (disputeError) throw new Error(`Failed to create dispute: ${disputeError.message}`);
     logStep("Dispute created");
 
-    // Update booking
+    // Update booking status
+    const updateData: Record<string, unknown> = isPostPayment
+      ? { status: "post_payment_dispute" }  // DO NOT change payout_status
+      : { status: "disputed", payout_status: "frozen" };
+
     const { error: updateError } = await supabase
       .from("bookings")
-      .update({
-        status: "disputed",
-        payout_status: "frozen",
-      })
+      .update(updateData)
       .eq("id", bookingId);
 
     if (updateError) throw new Error(`Failed to update booking: ${updateError.message}`);
-    logStep("Booking status updated to disputed");
+    logStep("Booking status updated", { newStatus: isPostPayment ? "post_payment_dispute" : "disputed" });
 
     // Get names for notifications
     const { data: contractor } = await supabase
