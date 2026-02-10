@@ -15,6 +15,7 @@ import ContractorDashboard from "./pages/ContractorDashboard";
 import PaymentSuccess from "./pages/PaymentSuccess";
 import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
+import Terms from "./pages/Terms";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
 
 const queryClient = new QueryClient();
