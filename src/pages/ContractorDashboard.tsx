@@ -186,9 +186,10 @@ const ContractorDashboard = () => {
     // Fetch available jobs (pending, paid, not assigned)
     const { data: availableData } = await supabase
       .from("bookings")
-      .select("id, address_id, user_id, scheduled_date, scheduled_time, time_slot, status, total_price, notes, created_at, updated_at, clippings_removal, is_weekend, is_public_holiday, grass_length, contractor_id, contractor_accepted_at, preferred_contractor_id, alternative_date, alternative_time_slot, alternative_suggested_at, alternative_suggested_by, quote_breakdown")
+      .select("id, address_id, user_id, scheduled_date, scheduled_time, time_slot, status, total_price, notes, created_at, updated_at, clippings_removal, is_weekend, is_public_holiday, grass_length, contractor_id, contractor_accepted_at, preferred_contractor_id, alternative_date, alternative_time_slot, alternative_suggested_at, alternative_suggested_by, quote_breakdown, payment_status, payment_method_id")
       .eq("status", "pending")
-      .eq("payment_status", "paid")
+      .eq("payment_status", "pending")
+      .not("payment_method_id", "is", null)
       .is("contractor_id", null)
       .order("scheduled_date", { ascending: true });
 
