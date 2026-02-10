@@ -65,14 +65,14 @@ export const IdentityBusinessStep = ({ data, onChange, userId, onNext }: Identit
         const address = place.formatted_address || "";
 
         onChange({
-          ...data,
+          ...dataRef.current,
           businessAddress: address,
           businessAddressLat: lat,
           businessAddressLng: lng,
         });
       }
     });
-  }, [mapLoaded, data, onChange]);
+  }, [mapLoaded, onChange]);
 
   // Initialize mailing address autocomplete
   useEffect(() => {
