@@ -314,7 +314,7 @@ const BookingDialog = ({ open, onOpenChange, addresses, defaultAddressId, onSucc
         onSuccess();
         onOpenChange(false);
       } else {
-        // Create new booking
+        // Create new booking with payment_status = 'pending' (not charged yet)
         const { data, error } = await supabase.from("bookings").insert([{
           user_id: user.id,
           address_id: selectedAddress.id,
@@ -328,7 +328,7 @@ const BookingDialog = ({ open, onOpenChange, addresses, defaultAddressId, onSucc
           total_price: totalWithGst,
           quote_breakdown: JSON.parse(JSON.stringify(quote)),
           status: "pending" as const,
-          payment_status: "unpaid",
+          payment_status: "pending",
           preferred_contractor_id: selectSpecificContractor && selectedContractorId ? selectedContractorId : null,
         }]).select().single();
 
@@ -336,19 +336,16 @@ const BookingDialog = ({ open, onOpenChange, addresses, defaultAddressId, onSucc
 
         setCreatedBookingId(data.id);
         
-        // Send booking created email (non-blocking)
-        sendBookingEmail(data.id, "created");
-        
-        // Create PaymentIntent via edge function
+        // Create SetupIntent via edge function (saves card, doesn't charge)
         const { data: paymentData, error: paymentError } = await supabase.functions.invoke(
-          "create-payment-intent",
+          "save-payment-method",
           {
-            body: { bookingId: data.id, amount: totalWithGst },
+            body: { bookingId: data.id },
           }
         );
 
         if (paymentError || !paymentData?.clientSecret) {
-          throw new Error(paymentError?.message || "Failed to create payment intent");
+          throw new Error(paymentError?.message || "Failed to set up payment");
         }
 
         setClientSecret(paymentData.clientSecret);
@@ -362,41 +359,44 @@ const BookingDialog = ({ open, onOpenChange, addresses, defaultAddressId, onSucc
     }
   };
 
-  const handlePaymentSuccess = async () => {
+  const handlePaymentSuccess = async (paymentMethodId: string) => {
     if (!createdBookingId) return;
 
-    // Update booking payment status
+    // Update booking with payment method ID (card saved, not charged yet)
     await supabase
       .from("bookings")
-      .update({ payment_status: "paid" })
+      .update({ 
+        payment_method_id: paymentMethodId,
+        payment_status: "pending",
+      })
       .eq("id", createdBookingId);
 
-    // Send booking confirmed email (non-blocking)
-    sendBookingEmail(createdBookingId, "confirmed");
+    // Send booking created email (non-blocking)
+    sendBookingEmail(createdBookingId, "created");
 
     setPaymentDialogOpen(false);
-    toast.success("Booking confirmed! A contractor will be assigned soon.");
+    toast.success("Booking submitted! You'll be charged when a contractor accepts your job.");
     onSuccess();
     onOpenChange(false);
   };
 
   const handlePaymentDialogClose = async (open: boolean) => {
     if (!open && createdBookingId) {
-      // Payment dialog was closed without completing payment - delete the unpaid booking
+      // Payment dialog was closed without saving payment method - delete the booking
       try {
         const { data: booking } = await supabase
           .from("bookings")
-          .select("payment_status")
+          .select("payment_status, payment_method_id")
           .eq("id", createdBookingId)
           .single();
 
-        if (booking?.payment_status === "unpaid") {
+        if (booking && !booking.payment_method_id) {
           await supabase
             .from("bookings")
             .delete()
             .eq("id", createdBookingId);
           
-          toast.info("Booking cancelled - payment was not completed");
+          toast.info("Booking cancelled - payment method was not saved");
         }
       } catch (error) {
         console.error("Error cleaning up booking:", error);

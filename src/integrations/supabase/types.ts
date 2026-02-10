@@ -136,6 +136,7 @@ export type Database = {
           alternative_suggested_at: string | null
           alternative_suggested_by: string | null
           alternative_time_slot: string | null
+          charged_at: string | null
           clippings_removal: boolean
           contractor_accepted_at: string | null
           contractor_id: string | null
@@ -146,7 +147,10 @@ export type Database = {
           is_weekend: boolean
           notes: string | null
           payment_intent_id: string | null
+          payment_method_id: string | null
           payment_status: string
+          payout_released_at: string | null
+          payout_status: string
           preferred_contractor_id: string | null
           quote_breakdown: Json | null
           scheduled_date: string
@@ -164,6 +168,7 @@ export type Database = {
           alternative_suggested_at?: string | null
           alternative_suggested_by?: string | null
           alternative_time_slot?: string | null
+          charged_at?: string | null
           clippings_removal?: boolean
           contractor_accepted_at?: string | null
           contractor_id?: string | null
@@ -174,7 +179,10 @@ export type Database = {
           is_weekend?: boolean
           notes?: string | null
           payment_intent_id?: string | null
+          payment_method_id?: string | null
           payment_status?: string
+          payout_released_at?: string | null
+          payout_status?: string
           preferred_contractor_id?: string | null
           quote_breakdown?: Json | null
           scheduled_date: string
@@ -192,6 +200,7 @@ export type Database = {
           alternative_suggested_at?: string | null
           alternative_suggested_by?: string | null
           alternative_time_slot?: string | null
+          charged_at?: string | null
           clippings_removal?: boolean
           contractor_accepted_at?: string | null
           contractor_id?: string | null
@@ -202,7 +211,10 @@ export type Database = {
           is_weekend?: boolean
           notes?: string | null
           payment_intent_id?: string | null
+          payment_method_id?: string | null
           payment_status?: string
+          payout_released_at?: string | null
+          payout_status?: string
           preferred_contractor_id?: string | null
           quote_breakdown?: Json | null
           scheduled_date?: string

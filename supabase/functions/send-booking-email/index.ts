@@ -66,15 +66,17 @@ const getEmailContent = (
   switch (emailType) {
     case "created":
       return {
-        subject: "Your Lawn Mowing Booking is Pending",
+        subject: "Your Lawn Mowing Booking Request is Pending",
         html: `
           <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto;">
-            <h1 style="color: #16a34a;">Booking Received! 🌿</h1>
+            <h1 style="color: #16a34a;">Booking Request Received! 🌿</h1>
             <p>Hi ${customerName},</p>
-            <p>Thank you for your booking! We've received your lawn mowing request and are processing it now.</p>
+            <p>Thank you for your booking request! We've sent it to contractors in your area.</p>
             ${baseInfo}
-            <p>You'll receive another email once payment is confirmed and a contractor is assigned.</p>
-            <p style="color: #666; margin-top: 30px;">Best regards,<br>The Lawn Care Team</p>
+            <p><strong>Your card has been saved but you will not be charged until a contractor accepts your job.</strong></p>
+            <p>You will be charged <strong>$${booking.total_price?.toFixed(2) || "0.00"}</strong> when a contractor accepts.</p>
+            <p>You'll receive another email once a contractor is assigned.</p>
+            <p style="color: #666; margin-top: 30px;">Best regards,<br>The Lawnly Team</p>
           </div>
         `,
       };
