@@ -138,7 +138,49 @@ const ContractorAuth = () => {
 
         if (error) {
           if (error.message.includes("already registered")) {
-            toast.error("This email is already registered. Please sign in.");
+            // Existing user — sign them in and add contractor role
+            const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+              email: formData.email,
+              password: formData.password,
+            });
+
+            if (signInError) {
+              toast.error("This email is already registered. Please sign in with your existing password.");
+            } else if (signInData.user) {
+              // Check if they already have contractor role
+              const { data: existingRoles } = await supabase
+                .from("user_roles")
+                .select("role")
+                .eq("user_id", signInData.user.id)
+                .eq("role", "contractor");
+
+              if (!existingRoles || existingRoles.length === 0) {
+                await supabase.from("user_roles").insert({
+                  user_id: signInData.user.id,
+                  role: "contractor",
+                });
+              }
+
+              // Check if contractor profile exists
+              const { data: existingContractor } = await supabase
+                .from("contractors")
+                .select("id")
+                .eq("user_id", signInData.user.id)
+                .single();
+
+              if (!existingContractor) {
+                await supabase.from("contractors").insert({
+                  user_id: signInData.user.id,
+                  business_name: null,
+                  service_areas: [],
+                  is_active: false,
+                  approval_status: "pending",
+                });
+              }
+
+              toast.success("Welcome! Please complete your contractor profile.");
+              navigate("/contractor-onboarding");
+            }
           } else {
             toast.error(error.message);
           }
