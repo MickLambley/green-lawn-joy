@@ -255,8 +255,15 @@ const ContractorDashboard = () => {
 
   const [acceptingJobId, setAcceptingJobId] = useState<string | null>(null);
 
+  const isStripeReady = stripeStatus.onboarding_complete && !stripeStatus.loading;
+
   const handleAcceptJob = async (booking: BookingWithAddress) => {
     if (!contractor) return;
+
+    if (!isStripeReady) {
+      toast.error("You must complete your Stripe payment setup before accepting jobs. Use the 'Complete Payment Setup' button above.");
+      return;
+    }
 
     // Tier-based restrictions
     const tier = (contractor as any).tier || "probation";
