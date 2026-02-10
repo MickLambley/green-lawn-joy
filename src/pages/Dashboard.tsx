@@ -337,6 +337,7 @@ const Dashboard = () => {
       rejected: { variant: "destructive", label: "Rejected" },
       confirmed: { variant: "default", label: "Confirmed" },
       completed: { variant: "outline", label: "Completed" },
+      completed_pending_verification: { variant: "secondary", label: "Awaiting Review" },
       cancelled: { variant: "destructive", label: "Cancelled" },
     };
     const { variant, label } = config[status] || { variant: "secondary", label: status };
