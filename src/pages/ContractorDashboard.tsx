@@ -45,6 +45,7 @@ import {
 import { toast } from "sonner";
 import type { Database } from "@/integrations/supabase/types";
 import JobDetailsDialog from "@/components/contractor/JobDetailsDialog";
+import ContractorTierBadge from "@/components/contractor/ContractorTierBadge";
 
 type Booking = Database["public"]["Tables"]["bookings"]["Row"];
 type Address = Database["public"]["Tables"]["addresses"]["Row"];
@@ -257,6 +258,27 @@ const ContractorDashboard = () => {
   const handleAcceptJob = async (booking: BookingWithAddress) => {
     if (!contractor) return;
 
+    // Tier-based restrictions
+    const tier = (contractor as any).tier || "probation";
+    const activeJobCount = myJobs.filter(j => j.status === "confirmed" || j.status === "pending").length;
+
+    if (tier === "probation") {
+      if (activeJobCount >= 3) {
+        toast.error("You've reached your maximum of 3 concurrent jobs for your tier. Complete existing jobs to accept new ones.");
+        return;
+      }
+      if (booking.total_price && Number(booking.total_price) > 150) {
+        toast.error("As a new contractor, you cannot accept jobs over $150. Complete more jobs to unlock higher-value work.");
+        return;
+      }
+    } else if (tier === "standard") {
+      if (activeJobCount >= 10) {
+        toast.error("You've reached your maximum of 10 concurrent jobs for your tier. Complete existing jobs to accept new ones.");
+        return;
+      }
+    }
+    // Premium: no restrictions
+
     setAcceptingJobId(booking.id);
     try {
       const { data, error } = await supabase.functions.invoke("charge-customer", {
@@ -415,6 +437,11 @@ const ContractorDashboard = () => {
             <div>
               <span className="text-xl font-display font-bold text-foreground">Lawnly</span>
               <Badge variant="outline" className="ml-2">Contractor</Badge>
+              {contractor?.tier && (
+                <span className="ml-2">
+                  <ContractorTierBadge tier={contractor.tier} />
+                </span>
+              )}
             </div>
           </div>
           <div className="flex items-center gap-4">

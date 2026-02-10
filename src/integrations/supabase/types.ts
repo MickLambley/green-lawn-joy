@@ -270,6 +270,7 @@ export type Database = {
           stripe_account_id: string | null
           stripe_onboarding_complete: boolean
           stripe_payouts_enabled: boolean
+          tier: Database["public"]["Enums"]["contractor_tier"]
           updated_at: string
           user_id: string
         }
@@ -294,6 +295,7 @@ export type Database = {
           stripe_account_id?: string | null
           stripe_onboarding_complete?: boolean
           stripe_payouts_enabled?: boolean
+          tier?: Database["public"]["Enums"]["contractor_tier"]
           updated_at?: string
           user_id: string
         }
@@ -318,6 +320,7 @@ export type Database = {
           stripe_account_id?: string | null
           stripe_onboarding_complete?: boolean
           stripe_payouts_enabled?: boolean
+          tier?: Database["public"]["Enums"]["contractor_tier"]
           updated_at?: string
           user_id?: string
         }
@@ -659,6 +662,7 @@ export type Database = {
         | "completed_pending_verification"
         | "disputed"
         | "post_payment_dispute"
+      contractor_tier: "probation" | "standard" | "premium"
       slope_type: "flat" | "mild" | "steep"
     }
     CompositeTypes: {
@@ -798,6 +802,7 @@ export const Constants = {
         "disputed",
         "post_payment_dispute",
       ],
+      contractor_tier: ["probation", "standard", "premium"],
       slope_type: ["flat", "mild", "steep"],
     },
   },
