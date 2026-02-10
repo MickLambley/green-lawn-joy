@@ -93,6 +93,29 @@ class PhotoDebugLogger {
       this.add("info", `Page visibility: ${document.visibilityState}`);
     });
 
+    // Detect page being unloaded (OOM kill, navigation, etc.)
+    window.addEventListener("pagehide", (event) => {
+      this.add("warn", "PAGE HIDE (possible OOM kill)", {
+        persisted: event.persisted,
+      });
+    });
+
+    window.addEventListener("beforeunload", () => {
+      this.add("warn", "BEFORE UNLOAD fired");
+    });
+
+    // Detect when page regains focus (returning from camera)
+    window.addEventListener("focus", () => {
+      this.add("info", "Window FOCUS regained (returned from camera?)");
+    });
+
+    window.addEventListener("pageshow", (event) => {
+      this.add("info", "PAGE SHOW", { persisted: event.persisted });
+      if (event.persisted) {
+        this.add("warn", "=== PAGE RESTORED FROM BF-CACHE ===");
+      }
+    });
+
     this.add("info", "Global error handlers installed");
   }
 
