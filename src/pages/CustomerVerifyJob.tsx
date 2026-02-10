@@ -392,6 +392,25 @@ const CustomerVerifyJob = () => {
             </Button>
           </div>
         )}
+
+        {/* Post-payment dispute button for completed bookings within 7-day window */}
+        {isCompleted && withinDisputeWindow && !approved && !disputed && (
+          <div className="space-y-3">
+            <Card className="border-yellow-500/30 bg-yellow-50 dark:bg-yellow-950/20">
+              <CardContent className="pt-6 text-sm text-yellow-800 dark:text-yellow-200">
+                <p>Payment has already been released. If you report an issue, our team will review it and may issue a refund from the platform balance.</p>
+              </CardContent>
+            </Card>
+            <Button
+              variant="outline"
+              className="w-full border-yellow-500 text-yellow-700 hover:bg-yellow-50 dark:text-yellow-400 dark:hover:bg-yellow-950/30"
+              onClick={() => setDisputeDialogOpen(true)}
+            >
+              <AlertTriangle className="w-5 h-5 mr-2" />
+              Report an Issue
+            </Button>
+          </div>
+        )}
       </main>
 
       {/* Approve Confirmation Dialog */}
