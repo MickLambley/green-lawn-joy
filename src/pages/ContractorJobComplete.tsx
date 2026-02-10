@@ -245,12 +245,12 @@ const ContractorJobComplete = () => {
         continue;
       }
 
-      const { data: urlData } = supabase.storage.from("job-photos").getPublicUrl(filePath);
+      const { data: signedData } = await supabase.storage.from("job-photos").createSignedUrl(filePath, 3600);
 
       setPhotos((prev) =>
         prev.map((p) =>
           p === item
-            ? { ...p, uploading: false, uploaded: true, photoUrl: filePath, thumbnailUrl: urlData.publicUrl }
+            ? { ...p, uploading: false, uploaded: true, photoUrl: filePath, thumbnailUrl: signedData?.signedUrl || undefined }
             : p
         )
       );
