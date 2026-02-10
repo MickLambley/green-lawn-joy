@@ -11,3 +11,6 @@ verify_jwt = false
 
 [functions.release-payout]
 verify_jwt = false
+
+[functions.auto-release-payouts]
+verify_jwt = false
