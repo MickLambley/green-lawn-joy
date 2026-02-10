@@ -105,6 +105,14 @@ const CustomerVerifyJob = () => {
       return;
     }
 
+    // Allow access for completed_pending_verification, completed (within 7 days), disputed, post_payment_dispute
+    const allowedStatuses = ["completed_pending_verification", "completed", "disputed", "post_payment_dispute"];
+    if (!allowedStatuses.includes(bookingData.status)) {
+      toast.error("This booking cannot be reviewed");
+      navigate("/dashboard");
+      return;
+    }
+
     setBooking(bookingData);
 
     // Get contractor name
