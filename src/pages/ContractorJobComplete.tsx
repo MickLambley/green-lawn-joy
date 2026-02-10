@@ -66,6 +66,8 @@ const ContractorJobComplete = () => {
   const minPhotos = contractorTier === "probation" ? 2 : 1;
 
   useEffect(() => {
+    photoLogger.installGlobalHandlers();
+    photoLogger.info("ContractorJobComplete MOUNTED", { bookingId });
     fetchBookingData();
   }, [bookingId]);
 
