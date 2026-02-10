@@ -314,7 +314,7 @@ const BookingDialog = ({ open, onOpenChange, addresses, defaultAddressId, onSucc
         onSuccess();
         onOpenChange(false);
       } else {
-        // Create new booking
+        // Create new booking with payment_status = 'pending' (not charged yet)
         const { data, error } = await supabase.from("bookings").insert([{
           user_id: user.id,
           address_id: selectedAddress.id,
@@ -328,7 +328,7 @@ const BookingDialog = ({ open, onOpenChange, addresses, defaultAddressId, onSucc
           total_price: totalWithGst,
           quote_breakdown: JSON.parse(JSON.stringify(quote)),
           status: "pending" as const,
-          payment_status: "unpaid",
+          payment_status: "pending",
           preferred_contractor_id: selectSpecificContractor && selectedContractorId ? selectedContractorId : null,
         }]).select().single();
 
@@ -336,19 +336,16 @@ const BookingDialog = ({ open, onOpenChange, addresses, defaultAddressId, onSucc
 
         setCreatedBookingId(data.id);
         
-        // Send booking created email (non-blocking)
-        sendBookingEmail(data.id, "created");
-        
-        // Create PaymentIntent via edge function
+        // Create SetupIntent via edge function (saves card, doesn't charge)
         const { data: paymentData, error: paymentError } = await supabase.functions.invoke(
-          "create-payment-intent",
+          "save-payment-method",
           {
-            body: { bookingId: data.id, amount: totalWithGst },
+            body: { bookingId: data.id },
           }
         );
 
         if (paymentError || !paymentData?.clientSecret) {
-          throw new Error(paymentError?.message || "Failed to create payment intent");
+          throw new Error(paymentError?.message || "Failed to set up payment");
         }
 
         setClientSecret(paymentData.clientSecret);
