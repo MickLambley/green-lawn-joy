@@ -366,7 +366,7 @@ const Dashboard = () => {
   const verifiedAddresses = addresses.filter((a) => a.status === "verified");
   const pendingAddresses = addresses.filter((a) => a.status === "pending");
   const upcomingBookings = bookings.filter((b) => b.status === "pending" || b.status === "confirmed");
-  const completedBookings = bookings.filter((b) => b.status === "completed" || b.status === "completed_pending_verification");
+  const completedBookings = bookings.filter((b) => b.status === "completed" || b.status === "completed_pending_verification" || b.status === "post_payment_dispute");
 
   return (
     <div className="min-h-screen bg-background">
