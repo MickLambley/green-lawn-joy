@@ -359,20 +359,23 @@ const BookingDialog = ({ open, onOpenChange, addresses, defaultAddressId, onSucc
     }
   };
 
-  const handlePaymentSuccess = async () => {
+  const handlePaymentSuccess = async (paymentMethodId: string) => {
     if (!createdBookingId) return;
 
-    // Update booking payment status
+    // Update booking with payment method ID (card saved, not charged yet)
     await supabase
       .from("bookings")
-      .update({ payment_status: "paid" })
+      .update({ 
+        payment_method_id: paymentMethodId,
+        payment_status: "pending",
+      })
       .eq("id", createdBookingId);
 
-    // Send booking confirmed email (non-blocking)
-    sendBookingEmail(createdBookingId, "confirmed");
+    // Send booking created email (non-blocking)
+    sendBookingEmail(createdBookingId, "created");
 
     setPaymentDialogOpen(false);
-    toast.success("Booking confirmed! A contractor will be assigned soon.");
+    toast.success("Booking submitted! You'll be charged when a contractor accepts your job.");
     onSuccess();
     onOpenChange(false);
   };
