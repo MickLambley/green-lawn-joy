@@ -8,3 +8,6 @@ verify_jwt = false
 
 [functions.calculate-quote]
 verify_jwt = false
+
+[functions.release-payout]
+verify_jwt = false
