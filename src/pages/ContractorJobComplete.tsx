@@ -272,16 +272,19 @@ const ContractorJobComplete = () => {
       const timestamp = Date.now();
       const filePath = `${bookingId}/${type}-${timestamp}-${Math.random().toString(36).slice(2, 8)}.jpg`;
 
+      photoLogger.info("Uploading to storage...", { filePath, compressedSize: `${(compressed.size / 1024).toFixed(1)}KB` });
       const { error: uploadError } = await supabase.storage
         .from("job-photos")
         .upload(filePath, compressed, { contentType: "image/jpeg" });
 
       if (uploadError) {
+        photoLogger.error("Storage upload failed", { error: uploadError.message, filePath });
         toast.error(`Photo ${i + 1} of ${total} failed: ${uploadError.message}`);
         setPhotos((prev) => prev.filter((p) => p !== item));
         continue;
       }
 
+      photoLogger.info("Inserting DB record...");
       const { error: dbError } = await supabase.from("job_photos").insert({
         booking_id: bookingId,
         contractor_id: contractor.id,
@@ -290,6 +293,7 @@ const ContractorJobComplete = () => {
       });
 
       if (dbError) {
+        photoLogger.error("DB insert failed", { error: dbError.message });
         toast.error(`Photo ${i + 1} record failed: ${dbError.message}`);
         continue;
       }
@@ -303,6 +307,7 @@ const ContractorJobComplete = () => {
             : p
         )
       );
+      photoLogger.info(`File ${i + 1}/${total} complete`);
     }
 
     // Clear file inputs to release file references from memory
@@ -310,6 +315,7 @@ const ContractorJobComplete = () => {
       if (ref.current) ref.current.value = "";
     });
 
+    photoLogger.info("handleFileSelect DONE", { type, totalProcessed: total });
     setUploadProgress(null);
   };
 
