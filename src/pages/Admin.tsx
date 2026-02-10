@@ -405,6 +405,10 @@ const Admin = () => {
               Contractors
               <PendingContractorsBadge />
             </TabsTrigger>
+            <TabsTrigger value="disputes" className="flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4" />
+              Disputes
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="addresses">
