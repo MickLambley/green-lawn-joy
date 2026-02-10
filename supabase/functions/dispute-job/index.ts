@@ -139,10 +139,11 @@ serve(async (req) => {
             body: JSON.stringify({
               from: "Lawn Care <onboarding@resend.dev>",
               to: ["admin@lawnly.com.au"],
-              subject: `Dispute Raised - Job #${bookingId.slice(0, 8)}`,
+              subject: `${isPostPayment ? "⚠️ Post-Payment " : ""}Dispute Raised - Job #${bookingId.slice(0, 8)}`,
               html: `
                 <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto;">
-                  <h1 style="color: #d97706;">Dispute Raised ⚠️</h1>
+                  <h1 style="color: #d97706;">${isPostPayment ? "⚠️ Post-Payment Dispute" : "Dispute Raised ⚠️"}</h1>
+                  ${isPostPayment ? '<p style="color: #dc2626; font-weight: bold;">⚠️ Payment Already Released - Refund will come from platform balance</p>' : ""}
                   <p>A dispute has been raised for Job #${bookingId.slice(0, 8)}. Review required.</p>
                   <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
                     <p style="margin: 5px 0;"><strong>Customer:</strong> ${customerName}</p>
