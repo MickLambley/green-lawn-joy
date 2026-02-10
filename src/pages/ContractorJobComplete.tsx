@@ -145,6 +145,35 @@ const ContractorJobComplete = () => {
     setLoading(false);
   };
 
+  const compressImage = (file: File, maxWidth = 1200, quality = 0.7): Promise<Blob> => {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      const url = URL.createObjectURL(file);
+      img.onload = () => {
+        URL.revokeObjectURL(url);
+        const canvas = document.createElement("canvas");
+        let width = img.width;
+        let height = img.height;
+        if (width > maxWidth) {
+          height = Math.round((height * maxWidth) / width);
+          width = maxWidth;
+        }
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) { reject(new Error("Canvas not supported")); return; }
+        ctx.drawImage(img, 0, 0, width, height);
+        canvas.toBlob(
+          (blob) => { blob ? resolve(blob) : reject(new Error("Compression failed")); },
+          "image/jpeg",
+          quality
+        );
+      };
+      img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("Failed to load image")); };
+      img.src = url;
+    });
+  };
+
   const handleFileSelect = async (
     files: FileList | null,
     type: "before" | "after"
@@ -152,35 +181,38 @@ const ContractorJobComplete = () => {
     if (!files || !bookingId || !contractor) return;
 
     const setPhotos = type === "before" ? setBeforePhotos : setAfterPhotos;
-    const newItems: PhotoItem[] = [];
 
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
-      const previewUrl = URL.createObjectURL(file);
-      const item: PhotoItem = { file, previewUrl, uploading: true };
-      newItems.push(item);
-    }
 
-    setPhotos((prev) => [...prev, ...newItems]);
+      // Compress image to reduce memory usage
+      let compressed: Blob;
+      try {
+        compressed = await compressImage(file);
+      } catch {
+        toast.error("Failed to process photo. Try a smaller image.");
+        continue;
+      }
 
-    // Upload each file
-    for (const item of newItems) {
-      if (!item.file) continue;
+      const previewUrl = URL.createObjectURL(compressed);
+      const item: PhotoItem = { file: new File([compressed], file.name, { type: "image/jpeg" }), previewUrl, uploading: true };
+
+      setPhotos((prev) => [...prev, item]);
 
       const timestamp = Date.now();
       const filePath = `${bookingId}/${type}-${timestamp}-${Math.random().toString(36).slice(2, 8)}.jpg`;
 
       const { error: uploadError } = await supabase.storage
         .from("job-photos")
-        .upload(filePath, item.file, { contentType: item.file.type });
+        .upload(filePath, compressed, { contentType: "image/jpeg" });
 
       if (uploadError) {
         toast.error(`Failed to upload photo: ${uploadError.message}`);
+        URL.revokeObjectURL(previewUrl);
         setPhotos((prev) => prev.filter((p) => p !== item));
         continue;
       }
 
-      // Insert record
       const { error: dbError } = await supabase.from("job_photos").insert({
         booking_id: bookingId,
         contractor_id: contractor.id,
@@ -193,7 +225,6 @@ const ContractorJobComplete = () => {
         continue;
       }
 
-      // Update item state
       setPhotos((prev) =>
         prev.map((p) =>
           p === item
