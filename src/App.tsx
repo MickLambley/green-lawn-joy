@@ -50,6 +50,11 @@ const App = () => (
               <ContractorDashboard />
             </ProtectedRoute>
           } />
+          <Route path="/contractor/jobs/:id/complete" element={
+            <ProtectedRoute requiredRole="contractor" redirectTo="/dashboard">
+              <ContractorJobComplete />
+            </ProtectedRoute>
+          } />
           <Route path="/settings" element={
             <ProtectedRoute redirectTo="/auth">
               <Settings />
