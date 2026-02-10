@@ -2,6 +2,7 @@
  * Debug logger for photo upload flow.
  * Captures detailed memory/timing info to diagnose mobile OOM crashes.
  * Logs are stored in-memory and can be downloaded as a text file.
+ * Includes global error handlers to catch crashes before JS handlers run.
  */
 
 interface LogEntry {
@@ -14,6 +15,7 @@ interface LogEntry {
 class PhotoDebugLogger {
   private logs: LogEntry[] = [];
   private maxLogs = 500;
+  private globalHandlersInstalled = false;
 
   private getMemoryInfo(): Record<string, unknown> {
     const perf = (performance as any);
@@ -42,6 +44,56 @@ class PhotoDebugLogger {
     if (level === "error") console.error(prefix, message, data);
     else if (level === "warn") console.warn(prefix, message, data);
     else console.log(prefix, message, data);
+
+    // Persist to sessionStorage so logs survive soft crashes
+    try {
+      sessionStorage.setItem("photoDebugLogs", JSON.stringify(this.logs));
+    } catch {
+      // Storage full or unavailable
+    }
+  }
+
+  /** Install global error handlers to catch OOM and other crashes */
+  installGlobalHandlers() {
+    if (this.globalHandlersInstalled) return;
+    this.globalHandlersInstalled = true;
+
+    // Restore any logs from a previous crash
+    try {
+      const saved = sessionStorage.getItem("photoDebugLogs");
+      if (saved) {
+        const parsed = JSON.parse(saved) as LogEntry[];
+        if (parsed.length > 0 && this.logs.length === 0) {
+          this.logs = parsed;
+          this.add("warn", "=== RESTORED LOGS FROM PREVIOUS SESSION (possible crash recovery) ===");
+        }
+      }
+    } catch {
+      // Ignore
+    }
+
+    window.addEventListener("error", (event) => {
+      this.add("error", "GLOBAL window.onerror", {
+        message: event.message,
+        filename: event.filename,
+        lineno: event.lineno,
+        colno: event.colno,
+        errorStr: event.error ? String(event.error) : undefined,
+      });
+    });
+
+    window.addEventListener("unhandledrejection", (event) => {
+      this.add("error", "GLOBAL unhandledrejection", {
+        reason: event.reason ? String(event.reason) : "unknown",
+      });
+    });
+
+    // Detect page visibility changes (can indicate browser killing the tab)
+    document.addEventListener("visibilitychange", () => {
+      this.add("info", `Page visibility: ${document.visibilityState}`);
+    });
+
+    this.add("info", "Global error handlers installed");
   }
 
   info(message: string, data?: Record<string, unknown>) {
@@ -93,6 +145,7 @@ class PhotoDebugLogger {
 
   clear() {
     this.logs = [];
+    try { sessionStorage.removeItem("photoDebugLogs"); } catch {}
   }
 }
 
