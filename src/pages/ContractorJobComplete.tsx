@@ -423,28 +423,34 @@ const ContractorJobComplete = () => {
               Take photos of the lawn <strong>before</strong> you start mowing.
             </p>
 
-            {/* File list */}
-            <div className="space-y-2">
+            {/* Photo thumbnails */}
+            <div className="grid grid-cols-3 gap-2">
               {beforePhotos.map((photo, idx) => (
-                <div key={idx} className="flex items-center gap-3 p-2 rounded-lg border bg-muted/30">
+                <div key={idx} className="relative aspect-square rounded-lg border bg-muted/30 overflow-hidden">
                   {photo.uploading ? (
-                    <Loader2 className="w-5 h-5 animate-spin text-primary shrink-0" />
-                  ) : photo.uploaded ? (
-                    <CheckCircle2 className="w-5 h-5 text-green-500 shrink-0" />
-                  ) : null}
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate">{photo.fileName}</p>
-                    {photo.fileSize > 0 && (
-                      <p className="text-xs text-muted-foreground">
-                        {(photo.fileSize / 1024).toFixed(0)} KB
-                      </p>
-                    )}
-                  </div>
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <Loader2 className="w-6 h-6 animate-spin text-primary" />
+                    </div>
+                  ) : photo.thumbnailUrl ? (
+                    <img
+                      src={photo.thumbnailUrl}
+                      alt={photo.fileName}
+                      className="w-full h-full object-cover"
+                      loading="lazy"
+                    />
+                  ) : (
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <ImageIcon className="w-6 h-6 text-muted-foreground" />
+                    </div>
+                  )}
+                  {photo.uploaded && (
+                    <CheckCircle2 className="absolute top-1 left-1 w-4 h-4 text-primary drop-shadow" />
+                  )}
                   <button
                     onClick={() => handleRemovePhoto(photo, "before")}
-                    className="p-1 rounded-full hover:bg-destructive hover:text-destructive-foreground transition-colors shrink-0"
+                    className="absolute top-1 right-1 p-0.5 rounded-full bg-background/80 hover:bg-destructive hover:text-destructive-foreground transition-colors"
                   >
-                    <X className="w-4 h-4" />
+                    <X className="w-3.5 h-3.5" />
                   </button>
                 </div>
               ))}
