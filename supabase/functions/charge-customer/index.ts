@@ -119,7 +119,7 @@ serve(async (req) => {
         destination: contractor.stripe_account_id,
       },
       on_behalf_of: contractor.stripe_account_id,
-      statement_descriptor: "LAWNLY LAWN CARE",
+      statement_descriptor_suffix: "LAWNLY",
       metadata: {
         booking_id: booking.id,
         contractor_id: contractor.id,
