@@ -661,11 +661,33 @@ const BookingDialog = ({ open, onOpenChange, addresses, defaultAddressId, onSucc
                 </div>
               </div>
 
+              {/* Terms & Conditions Agreement */}
+              {!isEditMode && (
+                <div className="flex items-start space-x-3 p-4 rounded-lg border border-border">
+                  <Checkbox
+                    id="agree-terms"
+                    checked={agreedToTerms}
+                    onCheckedChange={(checked) => setAgreedToTerms(checked === true)}
+                    className="mt-0.5"
+                  />
+                  <label htmlFor="agree-terms" className="text-sm leading-relaxed cursor-pointer">
+                    I have read and agree to the{" "}
+                    <a href="/terms" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline font-medium">
+                      Terms &amp; Conditions
+                    </a>{" "}
+                    and{" "}
+                    <a href="/privacy" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline font-medium">
+                      Privacy Policy
+                    </a>
+                  </label>
+                </div>
+              )}
+
               <div className="flex gap-3">
                 <Button variant="outline" className="flex-1" onClick={() => setStep("form")}>
                   Modify Details
                 </Button>
-                <Button className="flex-1" size="lg" onClick={handleBookNow} disabled={loading}>
+                <Button className="flex-1" size="lg" onClick={handleBookNow} disabled={loading || (!isEditMode && !agreedToTerms)}>
                   {loading ? (
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                   ) : (
