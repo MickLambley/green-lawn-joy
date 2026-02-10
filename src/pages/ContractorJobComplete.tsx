@@ -66,6 +66,8 @@ const ContractorJobComplete = () => {
   const minPhotos = contractorTier === "probation" ? 2 : 1;
 
   useEffect(() => {
+    photoLogger.installGlobalHandlers();
+    photoLogger.info("ContractorJobComplete MOUNTED", { bookingId });
     fetchBookingData();
   }, [bookingId]);
 
@@ -157,7 +159,12 @@ const ContractorJobComplete = () => {
     setLoading(false);
   };
 
-  const compressImage = async (file: File, maxWidth = 600, quality = 0.6): Promise<Blob> => {
+  /**
+   * Ultra-low-memory image compression.
+   * Uses an <img> element with a blob URL (browser handles lazy decode)
+   * instead of createImageBitmap which can OOM on large files.
+   */
+  const compressImage = (file: File, maxWidth = 600, quality = 0.5): Promise<Blob> => {
     photoLogger.info("compressImage START", {
       fileName: file.name,
       fileSize: `${(file.size / 1024 / 1024).toFixed(2)}MB`,
@@ -166,100 +173,161 @@ const ContractorJobComplete = () => {
       quality,
     });
 
-    let bitmap: ImageBitmap | null = null;
-    try {
-      photoLogger.info("Creating ImageBitmap with resize...");
-      bitmap = await createImageBitmap(file, {
-        resizeWidth: Math.min(maxWidth, 600),
-        resizeQuality: "low",
-      });
-      photoLogger.info("ImageBitmap created", {
-        bitmapWidth: bitmap.width,
-        bitmapHeight: bitmap.height,
-      });
-    } catch (err: any) {
-      photoLogger.error("createImageBitmap FAILED", {
-        error: err?.message || String(err),
-        fileName: file.name,
-        fileSize: `${(file.size / 1024 / 1024).toFixed(2)}MB`,
-      });
-      throw new Error(`Image decode failed: ${err?.message || "unknown"}`);
-    }
-
-    const canvas = document.createElement("canvas");
-    canvas.width = bitmap.width;
-    canvas.height = bitmap.height;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) {
-      bitmap.close();
-      photoLogger.error("Canvas 2D context not available");
-      throw new Error("Canvas not supported");
-    }
-
-    try {
-      ctx.drawImage(bitmap, 0, 0);
-      photoLogger.info("Drew bitmap to canvas");
-    } catch (err: any) {
-      photoLogger.error("drawImage FAILED", { error: err?.message || String(err) });
-      throw err;
-    } finally {
-      bitmap.close();
-      photoLogger.info("Bitmap closed");
-    }
-
     return new Promise((resolve, reject) => {
-      canvas.toBlob(
-        (blob) => {
-          canvas.width = 0;
-          canvas.height = 0;
-          if (blob) {
-            photoLogger.info("compressImage DONE", {
-              outputSize: `${(blob.size / 1024).toFixed(1)}KB`,
-            });
-            resolve(blob);
-          } else {
-            photoLogger.error("canvas.toBlob returned null");
-            reject(new Error("Compression failed"));
+      const objectUrl = URL.createObjectURL(file);
+      const img = new Image();
+
+      img.onload = () => {
+        photoLogger.info("Image loaded via <img>", {
+          naturalWidth: img.naturalWidth,
+          naturalHeight: img.naturalHeight,
+        });
+
+        try {
+          // Calculate target dimensions
+          const scale = Math.min(1, maxWidth / img.naturalWidth);
+          const w = Math.round(img.naturalWidth * scale);
+          const h = Math.round(img.naturalHeight * scale);
+
+          photoLogger.info("Drawing to canvas", { targetW: w, targetH: h, scale });
+
+          const canvas = document.createElement("canvas");
+          canvas.width = w;
+          canvas.height = h;
+          const ctx = canvas.getContext("2d");
+          if (!ctx) {
+            URL.revokeObjectURL(objectUrl);
+            reject(new Error("Canvas not supported"));
+            return;
           }
-        },
-        "image/jpeg",
-        quality
-      );
+
+          ctx.drawImage(img, 0, 0, w, h);
+
+          // Release the image and object URL immediately
+          img.src = "";
+          URL.revokeObjectURL(objectUrl);
+          photoLogger.info("Image source cleared, object URL revoked");
+
+          canvas.toBlob(
+            (blob) => {
+              // Release canvas memory
+              canvas.width = 0;
+              canvas.height = 0;
+              if (blob) {
+                photoLogger.info("compressImage DONE", {
+                  outputSize: `${(blob.size / 1024).toFixed(1)}KB`,
+                });
+                resolve(blob);
+              } else {
+                photoLogger.error("canvas.toBlob returned null");
+                reject(new Error("Compression failed"));
+              }
+            },
+            "image/jpeg",
+            quality
+          );
+        } catch (err: any) {
+          URL.revokeObjectURL(objectUrl);
+          photoLogger.error("compressImage error in onload", {
+            error: err?.message || String(err),
+          });
+          reject(err);
+        }
+      };
+
+      img.onerror = (e) => {
+        URL.revokeObjectURL(objectUrl);
+        photoLogger.error("Image load FAILED via <img>", {
+          error: String(e),
+          fileName: file.name,
+        });
+        reject(new Error("Image load failed"));
+      };
+
+      // Set src last to trigger load
+      img.src = objectUrl;
     });
   };
 
-  const handleFileSelect = async (
+  /**
+   * Deferred file handler — uses setTimeout(0) to let the browser
+   * finish the camera intent before we touch the file data.
+   * This prevents OOM crashes on mobile where the browser is still
+   * holding camera resources when onChange fires.
+   */
+  const handleFileSelect = (
     files: FileList | null,
     type: "before" | "after"
   ) => {
-    if (!files || !bookingId || !contractor || files.length === 0) return;
+    photoLogger.info("onChange FIRED", { type, hasFiles: !!files, fileCount: files?.length ?? 0 });
 
-    const setPhotos = type === "before" ? setBeforePhotos : setAfterPhotos;
-    const fileArray = Array.from(files);
-    const total = fileArray.length;
+    if (!files || !bookingId || !contractor || files.length === 0) {
+      photoLogger.warn("handleFileSelect: no files or missing context");
+      return;
+    }
 
-    photoLogger.info("handleFileSelect START", {
-      type,
-      fileCount: total,
-      files: fileArray.map((f) => ({ name: f.name, size: `${(f.size / 1024 / 1024).toFixed(2)}MB`, type: f.type })),
+    // Copy file references immediately (FileList can become invalid)
+    const fileArray: File[] = [];
+    for (let i = 0; i < files.length; i++) {
+      fileArray.push(files[i]);
+    }
+
+    photoLogger.info("Files copied from FileList", {
+      count: fileArray.length,
+      files: fileArray.map((f) => ({
+        name: f.name,
+        size: `${(f.size / 1024 / 1024).toFixed(2)}MB`,
+        type: f.type,
+      })),
     });
 
+    // Clear file inputs IMMEDIATELY to release camera file handles
+    [beforeCameraRef, beforeGalleryRef, afterCameraRef, afterGalleryRef].forEach(ref => {
+      if (ref.current) ref.current.value = "";
+    });
+    photoLogger.info("File inputs cleared");
+
+    // Defer processing to next tick — gives browser time to free camera resources
+    setTimeout(() => {
+      processFiles(fileArray, type);
+    }, 100);
+  };
+
+  const processFiles = async (fileArray: File[], type: "before" | "after") => {
+    const setPhotos = type === "before" ? setBeforePhotos : setAfterPhotos;
+    const total = fileArray.length;
+
+    photoLogger.info("processFiles START (deferred)", { type, total });
     setUploadProgress({ active: true, type, current: 0, total });
 
     for (let i = 0; i < fileArray.length; i++) {
       const file = fileArray[i];
-      photoLogger.info(`Processing file ${i + 1}/${total}`, { name: file.name, size: `${(file.size / 1024 / 1024).toFixed(2)}MB` });
+      photoLogger.info(`Processing file ${i + 1}/${total}`, {
+        name: file.name,
+        size: `${(file.size / 1024 / 1024).toFixed(2)}MB`,
+      });
       setUploadProgress({ active: true, type, current: i + 1, total });
 
-      // Compress image
+      // Small delay between files to let GC run
+      if (i > 0) {
+        await new Promise(r => setTimeout(r, 200));
+        photoLogger.info("Inter-file GC pause done");
+      }
+
       let compressed: Blob;
       try {
         compressed = await compressImage(file);
       } catch (err: any) {
-        photoLogger.error(`Compression failed for file ${i + 1}/${total}`, { error: err?.message || String(err), fileName: file.name });
+        photoLogger.error(`Compression failed for file ${i + 1}/${total}`, {
+          error: err?.message || String(err),
+          fileName: file.name,
+        });
         toast.error(`Failed to process photo ${i + 1} of ${total}. Skipping.`);
         continue;
       }
+
+      // Release reference to original file ASAP
+      (fileArray as any)[i] = null;
 
       const item: PhotoItem = {
         fileName: file.name,
@@ -272,7 +340,11 @@ const ContractorJobComplete = () => {
       const timestamp = Date.now();
       const filePath = `${bookingId}/${type}-${timestamp}-${Math.random().toString(36).slice(2, 8)}.jpg`;
 
-      photoLogger.info("Uploading to storage...", { filePath, compressedSize: `${(compressed.size / 1024).toFixed(1)}KB` });
+      photoLogger.info("Uploading to storage...", {
+        filePath,
+        compressedSize: `${(compressed.size / 1024).toFixed(1)}KB`,
+      });
+
       const { error: uploadError } = await supabase.storage
         .from("job-photos")
         .upload(filePath, compressed, { contentType: "image/jpeg" });
@@ -298,7 +370,9 @@ const ContractorJobComplete = () => {
         continue;
       }
 
-      const { data: signedData } = await supabase.storage.from("job-photos").createSignedUrl(filePath, 3600);
+      const { data: signedData } = await supabase.storage
+        .from("job-photos")
+        .createSignedUrl(filePath, 3600);
 
       setPhotos((prev) =>
         prev.map((p) =>
@@ -310,12 +384,7 @@ const ContractorJobComplete = () => {
       photoLogger.info(`File ${i + 1}/${total} complete`);
     }
 
-    // Clear file inputs to release file references from memory
-    [beforeCameraRef, beforeGalleryRef, afterCameraRef, afterGalleryRef].forEach(ref => {
-      if (ref.current) ref.current.value = "";
-    });
-
-    photoLogger.info("handleFileSelect DONE", { type, totalProcessed: total });
+    photoLogger.info("processFiles DONE", { type, totalProcessed: total });
     setUploadProgress(null);
   };
 
