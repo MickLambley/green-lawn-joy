@@ -45,6 +45,7 @@ import {
 import { toast } from "sonner";
 import type { Database } from "@/integrations/supabase/types";
 import JobDetailsDialog from "@/components/contractor/JobDetailsDialog";
+import ContractorTierBadge from "@/components/contractor/ContractorTierBadge";
 
 type Booking = Database["public"]["Tables"]["bookings"]["Row"];
 type Address = Database["public"]["Tables"]["addresses"]["Row"];
