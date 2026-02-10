@@ -155,32 +155,47 @@ const ContractorJobComplete = () => {
     setLoading(false);
   };
 
-  const compressImage = (file: File, maxWidth = 1200, quality = 0.7): Promise<Blob> => {
+  const compressImage = async (file: File, maxWidth = 800, quality = 0.65): Promise<Blob> => {
+    // Use createImageBitmap with resize for memory-efficient decoding
+    // This avoids loading the full-resolution image into memory
+    let bitmap: ImageBitmap;
+    try {
+      bitmap = await createImageBitmap(file, {
+        resizeWidth: maxWidth,
+        resizeQuality: "medium",
+      });
+    } catch {
+      // Fallback: decode without resize options
+      bitmap = await createImageBitmap(file);
+    }
+
+    const canvas = document.createElement("canvas");
+    let width = bitmap.width;
+    let height = bitmap.height;
+    if (width > maxWidth) {
+      height = Math.round((height * maxWidth) / width);
+      width = maxWidth;
+    }
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) {
+      bitmap.close();
+      throw new Error("Canvas not supported");
+    }
+    ctx.drawImage(bitmap, 0, 0, width, height);
+    bitmap.close(); // Free memory immediately
+
     return new Promise((resolve, reject) => {
-      const img = new Image();
-      const url = URL.createObjectURL(file);
-      img.onload = () => {
-        URL.revokeObjectURL(url);
-        const canvas = document.createElement("canvas");
-        let width = img.width;
-        let height = img.height;
-        if (width > maxWidth) {
-          height = Math.round((height * maxWidth) / width);
-          width = maxWidth;
-        }
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext("2d");
-        if (!ctx) { reject(new Error("Canvas not supported")); return; }
-        ctx.drawImage(img, 0, 0, width, height);
-        canvas.toBlob(
-          (blob) => { blob ? resolve(blob) : reject(new Error("Compression failed")); },
-          "image/jpeg",
-          quality
-        );
-      };
-      img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("Failed to load image")); };
-      img.src = url;
+      canvas.toBlob(
+        (blob) => {
+          canvas.width = 0;
+          canvas.height = 0;
+          blob ? resolve(blob) : reject(new Error("Compression failed"));
+        },
+        "image/jpeg",
+        quality
+      );
     });
   };
 
