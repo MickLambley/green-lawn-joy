@@ -725,12 +725,21 @@ const ContractorDashboard = () => {
                           <Button
                             size="sm"
                             variant="outline"
-                            onClick={() => {
+                            disabled={!isStripeReady}
+                            title={!isStripeReady ? "Complete Stripe payment setup first" : undefined}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (!isStripeReady) {
+                                toast.error("You must complete your Stripe payment setup before suggesting times. Use the 'Complete Payment Setup' button above.");
+                                return;
+                              }
                               setSelectedJob(job);
                               setSuggestDialogOpen(true);
                             }}
                           >
                             <CalendarClock className="w-4 h-4 mr-1" />
+                            Suggest Time
+                          </Button>
                             Suggest Time
                           </Button>
                         </div>
