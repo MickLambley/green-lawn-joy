@@ -157,6 +157,7 @@ export type Database = {
           scheduled_date: string
           scheduled_time: string | null
           status: Database["public"]["Enums"]["booking_status"]
+          stripe_payout_id: string | null
           time_slot: string
           total_price: number | null
           updated_at: string
@@ -190,6 +191,7 @@ export type Database = {
           scheduled_date: string
           scheduled_time?: string | null
           status?: Database["public"]["Enums"]["booking_status"]
+          stripe_payout_id?: string | null
           time_slot?: string
           total_price?: number | null
           updated_at?: string
@@ -223,6 +225,7 @@ export type Database = {
           scheduled_date?: string
           scheduled_time?: string | null
           status?: Database["public"]["Enums"]["booking_status"]
+          stripe_payout_id?: string | null
           time_slot?: string
           total_price?: number | null
           updated_at?: string
