@@ -207,10 +207,9 @@ const ContractorJobComplete = () => {
         continue;
       }
 
-      const previewUrl = URL.createObjectURL(compressed);
       const item: PhotoItem = {
-        file: new File([compressed], file.name, { type: "image/jpeg" }),
-        previewUrl,
+        fileName: file.name,
+        fileSize: compressed.size,
         uploading: true,
       };
 
