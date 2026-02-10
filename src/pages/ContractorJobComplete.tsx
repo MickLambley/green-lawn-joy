@@ -21,6 +21,8 @@ import {
   AlertCircle,
 } from "lucide-react";
 import { toast } from "sonner";
+import { photoLogger } from "@/lib/photoDebugLogger";
+import { Download } from "lucide-react";
 
 interface PhotoItem {
   id?: string;
