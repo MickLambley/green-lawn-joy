@@ -34,14 +34,6 @@ function generateUUID(): string {
  * Returns true only if all conditions are met and no block conditions exist.
  */
 export function isTestModeAllowed(): boolean {
-  const hostname = typeof window !== "undefined" ? window.location.hostname : "";
-
-  // HARD LOCK: production domain — always false
-  if (hostname.includes("lawnly.com.au")) {
-    return false;
-  }
-
-  // Only requirement: env var must be explicitly enabled
   return import.meta.env.VITE_ENABLE_TEST_MODE === "true";
 }
 
