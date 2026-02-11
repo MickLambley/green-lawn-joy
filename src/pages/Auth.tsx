@@ -4,9 +4,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Leaf, Mail, Lock, User, ArrowRight, Loader2 } from "lucide-react";
+import { Leaf, Mail, Lock, User, ArrowRight, Loader2, FlaskConical } from "lucide-react";
 import { toast } from "sonner";
 import { z } from "zod";
+import { isTestModeAllowed, isTestModeActive } from "@/lib/testMode";
+import TestModeDialog from "@/components/test-mode/TestModeDialog";
 
 const emailSchema = z.string().email("Please enter a valid email address");
 const passwordSchema = z
@@ -27,8 +29,13 @@ const Auth = () => {
     fullName: "",
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [testModeOpen, setTestModeOpen] = useState(false);
+  const showTestMode = isTestModeAllowed();
 
   useEffect(() => {
+    // If test mode is active, skip real auth checks
+    if (isTestModeActive()) return;
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
         if (session?.user) {
@@ -128,6 +135,20 @@ const Auth = () => {
 
   return (
     <div className="min-h-screen bg-background flex">
+      {/* Test Mode Dialog */}
+      {showTestMode && <TestModeDialog open={testModeOpen} onOpenChange={setTestModeOpen} />}
+
+      {/* Test Mode Button */}
+      {showTestMode && (
+        <button
+          onClick={() => setTestModeOpen(true)}
+          className="fixed top-4 right-4 z-50 flex items-center gap-1.5 bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold px-3 py-1.5 rounded-full shadow-lg transition-colors"
+        >
+          <FlaskConical className="w-3.5 h-3.5" />
+          Test Mode
+        </button>
+      )}
+
       {/* Left Panel - Form */}
       <div className="flex-1 flex items-center justify-center p-8">
         <div className="w-full max-w-md">
