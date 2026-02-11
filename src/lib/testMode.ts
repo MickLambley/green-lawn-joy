@@ -1,13 +1,15 @@
 /**
- * TEST MODE - Local development & AI agent testing only.
- * 
+ * TEST MODE - Secure activation via URL query parameter + secret key.
+ *
  * Security:
- * 1. VITE_ENABLE_TEST_MODE must be "true"
- * 2. Hostname must be localhost/127.0.0.1 OR contain "lovable.app"
- * 3. HARD LOCK: hostname containing "lawnly.com.au" → always false
+ * 1. URL must contain ?test_key=<value> matching VITE_TEST_MODE_SECRET_KEY
+ * 2. NODE_ENV must NOT be "production"
+ * 3. sessionStorage flag limits activation to the current tab
+ * 4. Mock sessions auto-expire after 1 hour
  */
 
 const TEST_MODE_STORAGE_KEY = "lawnly_test_mode_session";
+const SESSION_FLAG_KEY = "testModeActive";
 const TEST_MODE_EXPIRY_MS = 60 * 60 * 1000; // 1 hour
 
 export interface TestModeUser {
@@ -31,10 +33,36 @@ function generateUUID(): string {
 }
 
 /**
- * Returns true only if all conditions are met and no block conditions exist.
+ * Returns true only when:
+ * 1. The URL query param `test_key` matches VITE_TEST_MODE_SECRET_KEY, OR sessionStorage flag is already set
+ * 2. NODE_ENV is not "production"
  */
 export function isTestModeAllowed(): boolean {
-  return import.meta.env.VITE_ENABLE_TEST_MODE === "true";
+  // Block in production builds
+  if (import.meta.env.PROD) {
+    return false;
+  }
+
+  const secretKey = import.meta.env.VITE_TEST_MODE_SECRET_KEY;
+  if (!secretKey) return false;
+
+  // If already activated this tab session, allow
+  if (sessionStorage.getItem(SESSION_FLAG_KEY) === "true") {
+    return true;
+  }
+
+  // Check URL query parameter
+  if (typeof window !== "undefined") {
+    const params = new URLSearchParams(window.location.search);
+    const urlKey = params.get("test_key");
+    if (urlKey && urlKey === secretKey) {
+      // Set session flag so subsequent navigations within the tab still work
+      sessionStorage.setItem(SESSION_FLAG_KEY, "true");
+      return true;
+    }
+  }
+
+  return false;
 }
 
 const PERSONAS: Record<TestPersona, () => TestModeUser> = {
@@ -89,7 +117,8 @@ export function activateTestMode(persona: TestPersona): TestModeUser {
 
   const user = PERSONAS[persona]();
   localStorage.setItem(TEST_MODE_STORAGE_KEY, JSON.stringify(user));
-  
+  sessionStorage.setItem(SESSION_FLAG_KEY, "true");
+
   console.log(
     `%c🧪 TEST MODE ACTIVATED [${new Date().toISOString()}]`,
     "background: #ff0000; color: white; font-size: 14px; padding: 4px 8px;",
@@ -100,9 +129,8 @@ export function activateTestMode(persona: TestPersona): TestModeUser {
 }
 
 export function getTestModeSession(): TestModeUser | null {
-  if (!isTestModeAllowed()) {
-    // Silently clear any stale test sessions in non-allowed environments
-    localStorage.removeItem(TEST_MODE_STORAGE_KEY);
+  // Must have sessionStorage flag for current tab
+  if (sessionStorage.getItem(SESSION_FLAG_KEY) !== "true") {
     return null;
   }
 
@@ -116,18 +144,21 @@ export function getTestModeSession(): TestModeUser | null {
     if (Date.now() > session.expires_at) {
       console.log("🧪 Test mode session expired, clearing.");
       localStorage.removeItem(TEST_MODE_STORAGE_KEY);
+      sessionStorage.removeItem(SESSION_FLAG_KEY);
       return null;
     }
 
     return session;
   } catch {
     localStorage.removeItem(TEST_MODE_STORAGE_KEY);
+    sessionStorage.removeItem(SESSION_FLAG_KEY);
     return null;
   }
 }
 
 export function clearTestModeSession(): void {
   localStorage.removeItem(TEST_MODE_STORAGE_KEY);
+  sessionStorage.removeItem(SESSION_FLAG_KEY);
   console.log(
     `%c🧪 TEST MODE DEACTIVATED [${new Date().toISOString()}]`,
     "background: #666; color: white; font-size: 14px; padding: 4px 8px;"
