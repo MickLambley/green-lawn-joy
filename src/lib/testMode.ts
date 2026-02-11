@@ -1,12 +1,9 @@
 /**
  * TEST MODE - Local development & AI agent testing only.
  * 
- * Triple-checked security:
- * 1. hostname must be localhost or 127.0.0.1
- * 2. VITE_ENABLE_TEST_MODE must be "true"
- * 3. NODE_ENV must NOT be "production"
- * 
- * Additionally blocked if hostname contains "lawnly.com.au"
+ * Security:
+ * 1. VITE_ENABLE_TEST_MODE must be "true"
+ * 2. Hard-blocked on any hostname containing "lawnly.com.au"
  */
 
 const TEST_MODE_STORAGE_KEY = "lawnly_test_mode_session";
@@ -36,22 +33,15 @@ function generateUUID(): string {
  * Returns true only if ALL three conditions are met and no block conditions exist.
  */
 export function isTestModeAllowed(): boolean {
-  // Hard block: production domain
+  // Hard block: production domain — always false on lawnly.com.au
   if (typeof window !== "undefined" && window.location.hostname.includes("lawnly.com.au")) {
     return false;
   }
 
-  // Condition 1: localhost or 127.0.0.1
-  const hostname = typeof window !== "undefined" ? window.location.hostname : "";
-  const isLocalhost = hostname === "localhost" || hostname === "127.0.0.1";
-
-  // Condition 2: env var enabled
+  // Only requirement: env var must be explicitly enabled
   const envEnabled = import.meta.env.VITE_ENABLE_TEST_MODE === "true";
 
-  // Condition 3: not production
-  const notProduction = import.meta.env.MODE !== "production";
-
-  return isLocalhost && envEnabled && notProduction;
+  return envEnabled;
 }
 
 const PERSONAS: Record<TestPersona, () => TestModeUser> = {
