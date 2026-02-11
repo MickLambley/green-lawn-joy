@@ -41,15 +41,8 @@ export function isTestModeAllowed(): boolean {
     return false;
   }
 
-  // Condition 1: env var enabled
-  const envEnabled = import.meta.env.VITE_ENABLE_TEST_MODE === "true";
-
-  // Condition 2: localhost or lovable.app preview
-  const isLocalhost = hostname === "localhost" || hostname === "127.0.0.1";
-  const isLovablePreview = hostname.includes("lovable.app");
-  const allowedHost = isLocalhost || isLovablePreview;
-
-  return envEnabled && allowedHost;
+  // Only requirement: env var must be explicitly enabled
+  return import.meta.env.VITE_ENABLE_TEST_MODE === "true";
 }
 
 const PERSONAS: Record<TestPersona, () => TestModeUser> = {
