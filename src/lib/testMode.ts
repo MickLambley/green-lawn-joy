@@ -3,7 +3,8 @@
  * 
  * Security:
  * 1. VITE_ENABLE_TEST_MODE must be "true"
- * 2. Hard-blocked on any hostname containing "lawnly.com.au"
+ * 2. Hostname must be localhost/127.0.0.1 OR contain "lovable.app"
+ * 3. HARD LOCK: hostname containing "lawnly.com.au" → always false
  */
 
 const TEST_MODE_STORAGE_KEY = "lawnly_test_mode_session";
@@ -30,18 +31,25 @@ function generateUUID(): string {
 }
 
 /**
- * Returns true only if ALL three conditions are met and no block conditions exist.
+ * Returns true only if all conditions are met and no block conditions exist.
  */
 export function isTestModeAllowed(): boolean {
-  // Hard block: production domain — always false on lawnly.com.au
-  if (typeof window !== "undefined" && window.location.hostname.includes("lawnly.com.au")) {
+  const hostname = typeof window !== "undefined" ? window.location.hostname : "";
+
+  // HARD LOCK: production domain — always false
+  if (hostname.includes("lawnly.com.au")) {
     return false;
   }
 
-  // Only requirement: env var must be explicitly enabled
+  // Condition 1: env var enabled
   const envEnabled = import.meta.env.VITE_ENABLE_TEST_MODE === "true";
 
-  return envEnabled;
+  // Condition 2: localhost or lovable.app preview
+  const isLocalhost = hostname === "localhost" || hostname === "127.0.0.1";
+  const isLovablePreview = hostname.includes("lovable.app");
+  const allowedHost = isLocalhost || isLovablePreview;
+
+  return envEnabled && allowedHost;
 }
 
 const PERSONAS: Record<TestPersona, () => TestModeUser> = {
