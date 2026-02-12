@@ -38,8 +38,8 @@ function generateUUID(): string {
  * 2. NODE_ENV is not "production"
  */
 export function isTestModeAllowed(): boolean {
-  // Block in production builds
-  if (import.meta.env.PROD) {
+  // Block unless explicitly allowed via env var
+  if (import.meta.env.VITE_ALLOW_TEST_MODE !== "true") {
     return false;
   }
 
