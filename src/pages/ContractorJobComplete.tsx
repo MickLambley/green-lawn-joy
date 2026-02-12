@@ -161,10 +161,12 @@ const ContractorJobComplete = () => {
 
   /**
    * Ultra-low-memory image compression.
-   * Uses an <img> element with a blob URL (browser handles lazy decode)
-   * instead of createImageBitmap which can OOM on large files.
+   * Strategy 1: createImageBitmap with resizeWidth — browser decodes at reduced
+   *   resolution so the full-res pixels never enter JS heap memory.
+   * Strategy 2 (fallback): <img> element + canvas for browsers without resize support.
    */
   const compressImage = (file: File, maxWidth = 600, quality = 0.5): Promise<Blob> => {
+    const startTime = performance.now();
     photoLogger.info("compressImage START", {
       fileName: file.name,
       fileSize: `${(file.size / 1024 / 1024).toFixed(2)}MB`,
@@ -173,23 +175,99 @@ const ContractorJobComplete = () => {
       quality,
     });
 
+    return compressWithBitmapResize(file, maxWidth, quality, startTime)
+      .catch((bitmapErr) => {
+        photoLogger.warn("createImageBitmap resize failed, falling back to <img>", {
+          error: bitmapErr?.message || String(bitmapErr),
+        });
+        return compressWithImgElement(file, maxWidth, quality, startTime);
+      });
+  };
+
+  /** Strategy 1: createImageBitmap with resizeWidth (lowest memory) */
+  const compressWithBitmapResize = async (
+    file: File,
+    maxWidth: number,
+    quality: number,
+    startTime: number
+  ): Promise<Blob> => {
+    // First get natural dimensions without decoding full pixels
+    const probeBitmap = await createImageBitmap(file);
+    const natW = probeBitmap.width;
+    const natH = probeBitmap.height;
+    probeBitmap.close(); // free immediately
+    photoLogger.info("Probe bitmap dimensions (closed)", { natW, natH });
+
+    const scale = Math.min(1, maxWidth / natW);
+    const targetW = Math.round(natW * scale);
+    const targetH = Math.round(natH * scale);
+    photoLogger.info("createImageBitmap resize target", { targetW, targetH, scale });
+
+    // Decode at target resolution — browser never holds full-res pixels
+    const bitmap = await createImageBitmap(file, {
+      resizeWidth: targetW,
+      resizeHeight: targetH,
+      resizeQuality: "low",
+    });
+    photoLogger.info("Resized bitmap created", { w: bitmap.width, h: bitmap.height });
+
+    const canvas = document.createElement("canvas");
+    canvas.width = targetW;
+    canvas.height = targetH;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) {
+      bitmap.close();
+      throw new Error("Canvas not supported");
+    }
+
+    ctx.drawImage(bitmap, 0, 0);
+    bitmap.close(); // free decoded pixels
+    photoLogger.info("Bitmap drawn to canvas and closed");
+
+    return new Promise<Blob>((resolve, reject) => {
+      canvas.toBlob(
+        (blob) => {
+          canvas.width = 0;
+          canvas.height = 0;
+          if (blob) {
+            photoLogger.info("compressImage DONE (bitmap path)", {
+              outputSize: `${(blob.size / 1024).toFixed(1)}KB`,
+              elapsed: `${(performance.now() - startTime).toFixed(0)}ms`,
+            });
+            resolve(blob);
+          } else {
+            photoLogger.error("canvas.toBlob returned null (bitmap path)");
+            reject(new Error("Compression failed"));
+          }
+        },
+        "image/jpeg",
+        quality
+      );
+    });
+  };
+
+  /** Strategy 2 (fallback): <img> + canvas */
+  const compressWithImgElement = (
+    file: File,
+    maxWidth: number,
+    quality: number,
+    startTime: number
+  ): Promise<Blob> => {
     return new Promise((resolve, reject) => {
       const objectUrl = URL.createObjectURL(file);
       const img = new Image();
 
       img.onload = () => {
-        photoLogger.info("Image loaded via <img>", {
+        photoLogger.info("Image loaded via <img> (fallback)", {
           naturalWidth: img.naturalWidth,
           naturalHeight: img.naturalHeight,
         });
 
         try {
-          // Calculate target dimensions
           const scale = Math.min(1, maxWidth / img.naturalWidth);
           const w = Math.round(img.naturalWidth * scale);
           const h = Math.round(img.naturalHeight * scale);
-
-          photoLogger.info("Drawing to canvas", { targetW: w, targetH: h, scale });
+          photoLogger.info("Drawing to canvas (fallback)", { targetW: w, targetH: h, scale });
 
           const canvas = document.createElement("canvas");
           canvas.width = w;
@@ -205,17 +283,17 @@ const ContractorJobComplete = () => {
 
           canvas.toBlob(
             (blob) => {
-              // Release resources only after toBlob completes
               URL.revokeObjectURL(objectUrl);
               canvas.width = 0;
               canvas.height = 0;
               if (blob) {
-                photoLogger.info("compressImage DONE", {
+                photoLogger.info("compressImage DONE (fallback)", {
                   outputSize: `${(blob.size / 1024).toFixed(1)}KB`,
+                  elapsed: `${(performance.now() - startTime).toFixed(0)}ms`,
                 });
                 resolve(blob);
               } else {
-                photoLogger.error("canvas.toBlob returned null");
+                photoLogger.error("canvas.toBlob returned null (fallback)");
                 reject(new Error("Compression failed"));
               }
             },
@@ -224,7 +302,7 @@ const ContractorJobComplete = () => {
           );
         } catch (err: any) {
           URL.revokeObjectURL(objectUrl);
-          photoLogger.error("compressImage error in onload", {
+          photoLogger.error("compressImage error in onload (fallback)", {
             error: err?.message || String(err),
           });
           reject(err);
@@ -233,14 +311,13 @@ const ContractorJobComplete = () => {
 
       img.onerror = (e) => {
         URL.revokeObjectURL(objectUrl);
-        photoLogger.error("Image load FAILED via <img>", {
+        photoLogger.error("Image load FAILED via <img> (fallback)", {
           error: String(e),
           fileName: file.name,
         });
         reject(new Error("Image load failed"));
       };
 
-      // Set src last to trigger load
       img.src = objectUrl;
     });
   };
@@ -293,21 +370,28 @@ const ContractorJobComplete = () => {
     const setPhotos = type === "before" ? setBeforePhotos : setAfterPhotos;
     const total = fileArray.length;
 
-    photoLogger.info("processFiles START (deferred)", { type, total });
+    photoLogger.info("processFiles START (deferred)", {
+      type,
+      total,
+      deviceMemory: (navigator as any).deviceMemory || "unknown",
+      hardwareConcurrency: navigator.hardwareConcurrency || "unknown",
+    });
     setUploadProgress({ active: true, type, current: 0, total });
 
     for (let i = 0; i < fileArray.length; i++) {
       const file = fileArray[i];
+      if (!file) continue; // may have been nulled
+
       photoLogger.info(`Processing file ${i + 1}/${total}`, {
         name: file.name,
         size: `${(file.size / 1024 / 1024).toFixed(2)}MB`,
       });
       setUploadProgress({ active: true, type, current: i + 1, total });
 
-      // Small delay between files to let GC run
+      // Longer delay between files to let GC reclaim memory
       if (i > 0) {
-        await new Promise(r => setTimeout(r, 200));
-        photoLogger.info("Inter-file GC pause done");
+        await new Promise(r => setTimeout(r, 500));
+        photoLogger.info("Inter-file GC pause done (500ms)");
       }
 
       let compressed: Blob;
@@ -316,6 +400,7 @@ const ContractorJobComplete = () => {
       } catch (err: any) {
         photoLogger.error(`Compression failed for file ${i + 1}/${total}`, {
           error: err?.message || String(err),
+          stack: err?.stack?.slice(0, 300),
           fileName: file.name,
         });
         toast.error(`Failed to process photo ${i + 1} of ${total}. Skipping.`);
@@ -344,6 +429,9 @@ const ContractorJobComplete = () => {
       const { error: uploadError } = await supabase.storage
         .from("job-photos")
         .upload(filePath, compressed, { contentType: "image/jpeg" });
+
+      // Release compressed blob reference
+      compressed = null as any;
 
       if (uploadError) {
         photoLogger.error("Storage upload failed", { error: uploadError.message, filePath });
