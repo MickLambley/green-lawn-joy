@@ -203,14 +203,10 @@ const ContractorJobComplete = () => {
 
           ctx.drawImage(img, 0, 0, w, h);
 
-          // Release the image and object URL immediately
-          img.src = "";
-          URL.revokeObjectURL(objectUrl);
-          photoLogger.info("Image source cleared, object URL revoked");
-
           canvas.toBlob(
             (blob) => {
-              // Release canvas memory
+              // Release resources only after toBlob completes
+              URL.revokeObjectURL(objectUrl);
               canvas.width = 0;
               canvas.height = 0;
               if (blob) {
