@@ -20,6 +20,8 @@ interface TestPersonaConfig {
     is_active: boolean;
     tier: string;
     stripe_onboarding_complete: boolean;
+    abn: string;
+    business_address: string;
   };
 }
 
@@ -43,9 +45,36 @@ const PERSONAS: Record<string, TestPersonaConfig> = {
       is_active: true,
       tier: "standard",
       stripe_onboarding_complete: true,
+      abn: "12345678901",
+      business_address: "123 Test Street, Melbourne VIC 3000",
     },
   },
 };
+
+async function ensureTestAddress(adminClient: any, userId: string) {
+  const { data: existingAddr } = await adminClient
+    .from("addresses")
+    .select("id")
+    .eq("user_id", userId)
+    .limit(1)
+    .maybeSingle();
+
+  if (!existingAddr) {
+    await adminClient.from("addresses").insert({
+      user_id: userId,
+      street_address: "42 Test Avenue",
+      city: "Melbourne",
+      state: "VIC",
+      postal_code: "3000",
+      country: "Australia",
+      status: "verified",
+      square_meters: 150,
+      slope: "flat",
+      tier_count: 1,
+      verified_at: new Date().toISOString(),
+    });
+  }
+}
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -137,6 +166,11 @@ Deno.serve(async (req) => {
         }
       }
 
+      // Create verified address for customer
+      if (config.role === "user") {
+        await ensureTestAddress(adminClient, userId);
+      }
+
       // Now sign in
       signInResult = await anonClient.auth.signInWithPassword({
         email: config.email,
@@ -147,12 +181,17 @@ Deno.serve(async (req) => {
         throw new Error(`Failed to sign in after creation: ${signInResult.error.message}`);
       }
     } else {
-      // User exists - ensure contractor profile exists if needed
+      // User exists - ensure setup is complete
       const userId = signInResult.data.user.id;
+
+      if (config.role === "user") {
+        await ensureTestAddress(adminClient, userId);
+      }
+
       if (config.role === "contractor" && config.contractor_profile) {
         const { data: existingContractor } = await adminClient
           .from("contractors")
-          .select("id")
+          .select("id, abn")
           .eq("user_id", userId)
           .maybeSingle();
 
@@ -176,6 +215,16 @@ Deno.serve(async (req) => {
             user_id: userId,
             ...config.contractor_profile,
           });
+        } else if (!existingContractor.abn) {
+          // Update existing contractor with missing fields
+          await adminClient.from("contractors").update({
+            abn: config.contractor_profile.abn,
+            business_address: config.contractor_profile.business_address,
+            approval_status: config.contractor_profile.approval_status,
+            is_active: config.contractor_profile.is_active,
+            tier: config.contractor_profile.tier,
+            stripe_onboarding_complete: config.contractor_profile.stripe_onboarding_complete,
+          }).eq("id", existingContractor.id);
         }
       }
     }
