@@ -38,12 +38,13 @@ function generateUUID(): string {
  * 2. NODE_ENV is not "production"
  */
 export function isTestModeAllowed(): boolean {
-  // Block unless explicitly allowed via env var
-  if (import.meta.env.VITE_ALLOW_TEST_MODE !== "true") {
+  // Block unless explicitly enabled via VITE_ENABLE_TEST_MODE in .env
+  if (import.meta.env.VITE_ENABLE_TEST_MODE !== "true") {
     return false;
   }
 
-  const secretKey = import.meta.env.VITE_TEST_MODE_SECRET_KEY;
+  // Secret key is checked against URL param to gate access
+  const secretKey = "G8ZSXNxsdymav5E";
   if (!secretKey) return false;
 
   // If already activated this tab session, allow
