@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { isTestModeActive, getTestModeSession } from "@/lib/testMode";
+
 import { User } from "@supabase/supabase-js";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -98,15 +98,6 @@ const ContractorDashboard = () => {
   }, []);
 
   const checkContractorAccess = async () => {
-    // In test mode, skip real auth
-    if (isTestModeActive()) {
-      const testSession = getTestModeSession();
-      if (testSession) {
-        setIsLoading(false);
-        return;
-      }
-    }
-
     const { data: { user } } = await supabase.auth.getUser();
     
     if (!user) {

@@ -2,7 +2,7 @@ import { useState, useEffect, ReactNode } from "react";
 import { Navigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
-import { isTestModeActive, getTestModeSession } from "@/lib/testMode";
+
 
 type AppRole = Database["public"]["Enums"]["app_role"];
 
@@ -20,18 +20,6 @@ const ProtectedRoute = ({
   const [authorized, setAuthorized] = useState<boolean | null>(null);
 
   useEffect(() => {
-    // Check test mode first
-    if (isTestModeActive()) {
-      const testSession = getTestModeSession();
-      if (testSession) {
-        if (!requiredRole) {
-          setAuthorized(true);
-        } else {
-          setAuthorized(testSession.role === requiredRole);
-        }
-        return;
-      }
-    }
     checkAuthorization();
   }, []);
 
