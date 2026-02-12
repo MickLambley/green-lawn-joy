@@ -40,16 +40,14 @@ const TestModeDialog = ({ open, onOpenChange }: TestModeDialogProps) => {
     try {
       const user = activateTestMode(persona);
       onOpenChange(false);
-      // Navigate based on role
+      // Use window.location.href so the browser actually navigates + reloads
       if (user.role === "contractor") {
-        navigate("/contractor");
+        window.location.href = "/contractor";
       } else {
-        navigate("/dashboard");
+        window.location.href = "/dashboard";
       }
-      window.location.reload();
     } catch (err) {
       console.error("Failed to activate test mode:", err);
-    } finally {
       setLoading(null);
     }
   };
