@@ -63,7 +63,7 @@ const ContractorJobComplete = () => {
   const afterCameraRef = useRef<HTMLInputElement>(null);
   const afterGalleryRef = useRef<HTMLInputElement>(null);
 
-  const minPhotos = contractorTier === "probation" ? 2 : 1;
+  const minPhotos = 4;
 
   useEffect(() => {
     photoLogger.installGlobalHandlers();
@@ -862,8 +862,7 @@ const ContractorJobComplete = () => {
           <div className="flex items-start gap-2 text-sm text-muted-foreground">
             <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
             <span>
-              You need at least {minPhotos} before {minPhotos === 1 ? "photo" : "photos"} and {minPhotos} after {minPhotos === 1 ? "photo" : "photos"} to complete this job.
-              {contractorTier === "probation" && " (Probation contractors require 2 of each.)"}
+              You need at least {minPhotos} before photos and {minPhotos} after photos to complete this job.
             </span>
           </div>
         )}
