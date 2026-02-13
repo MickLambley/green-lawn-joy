@@ -90,6 +90,14 @@ export const ReviewStep = ({
               <span className="font-medium text-green-600">✓ Uploaded</span>
             </div>
             <div className="flex justify-between">
+              <span className="text-muted-foreground">Insurance Expiry:</span>
+              <span className="font-medium">
+                {identityData.insuranceExpiryDate 
+                  ? new Date(identityData.insuranceExpiryDate).toLocaleDateString("en-AU", { day: "numeric", month: "short", year: "numeric" })
+                  : "Not set"}
+              </span>
+            </div>
+            <div className="flex justify-between">
               <span className="text-muted-foreground">Business Confirmation:</span>
               <span className="font-medium text-green-600">✓ Confirmed</span>
             </div>

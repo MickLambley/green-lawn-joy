@@ -44,9 +44,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   Eye, Check, X, FileText, Clock, MapPin, Wrench, Loader2, User,
   Edit, Trash2, Ban, UserCheck, Users, ArrowUpDown, ChevronUp, ChevronDown,
-  BarChart3, Filter,
+  BarChart3, Filter, Shield, AlertTriangle, Download, Upload,
 } from "lucide-react";
 import { toast } from "sonner";
+import { Checkbox } from "@/components/ui/checkbox";
 import ContractorPerformanceTab from "./ContractorPerformanceTab";
 import type { Database } from "@/integrations/supabase/types";
 
@@ -111,6 +112,8 @@ const ContractorApplicationsTab = () => {
   const [processing, setProcessing] = useState(false);
   const [adminNotes, setAdminNotes] = useState("");
   const [insuranceUrl, setInsuranceUrl] = useState<string | null>(null);
+  const [insuranceVerified, setInsuranceVerified] = useState(false);
+  const [insuranceExpiryDate, setInsuranceExpiryDate] = useState("");
   
   // Edit form state
   const [editBusinessName, setEditBusinessName] = useState("");
@@ -202,6 +205,8 @@ const ContractorApplicationsTab = () => {
     setSelectedContractor(contractor);
     setAdminNotes("");
     setInsuranceUrl(null);
+    setInsuranceVerified(contractor.insurance_verified || false);
+    setInsuranceExpiryDate(contractor.insurance_expiry_date || "");
 
     if (contractor.insurance_certificate_url) {
       const url = await getSignedUrl(contractor.insurance_certificate_url);
@@ -251,6 +256,8 @@ const ContractorApplicationsTab = () => {
       approved_at: approved ? new Date().toISOString() : null,
       approved_by: approved ? user?.id : null,
       is_active: approved,
+      insurance_verified: approved ? insuranceVerified : false,
+      insurance_expiry_date: insuranceExpiryDate || null,
     };
 
     const { error } = await supabase
@@ -644,6 +651,7 @@ const ContractorApplicationsTab = () => {
                       <TableHead className="cursor-pointer select-none" onClick={() => toggleSort("last_active_at")}>
                         <span className="flex items-center">Last Active<SortIcon field="last_active_at" /></span>
                       </TableHead>
+                      <TableHead>Insurance Expiry</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead>Actions</TableHead>
                     </TableRow>
@@ -684,6 +692,17 @@ const ContractorApplicationsTab = () => {
                         </TableCell>
                         <TableCell className="text-sm text-muted-foreground">
                           {formatRelativeTime(contractor.last_active_at)}
+                        </TableCell>
+                        <TableCell className="text-sm">
+                          {contractor.insurance_expiry_date ? (() => {
+                            const expiry = new Date(contractor.insurance_expiry_date);
+                            const now = new Date();
+                            const daysLeft = Math.ceil((expiry.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+                            const formatted = expiry.toLocaleDateString("en-AU", { day: "numeric", month: "short", year: "numeric" });
+                            if (daysLeft < 0) return <span className="text-destructive font-medium">Expired ⛔</span>;
+                            if (daysLeft <= 30) return <span className="text-amber-600 font-medium">{formatted} ⚠️</span>;
+                            return <span>{formatted}</span>;
+                          })() : <span className="text-muted-foreground">-</span>}
                         </TableCell>
                         <TableCell>
                           {getStatusBadge(contractor.approval_status, contractor.is_active)}
@@ -884,27 +903,63 @@ const ContractorApplicationsTab = () => {
                   </div>
                 )}
 
-                {/* Insurance Certificate */}
-                <div className="space-y-2">
-                  <Label className="flex items-center gap-2">
-                    <FileText className="w-4 h-4" />
-                    Insurance Certificate
+                {/* Insurance Certificate - Enhanced */}
+                <div className="space-y-3 p-4 border rounded-lg">
+                  <Label className="flex items-center gap-2 text-base font-semibold">
+                    <Shield className="w-4 h-4" />
+                    Insurance Verification
                   </Label>
+                  
+                  {/* Certificate Preview/Download */}
                   {insuranceUrl ? (
-                    <a
-                      href={insuranceUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-2 text-primary hover:underline"
-                    >
-                      <FileText className="w-4 h-4" />
-                      View Certificate (opens in new tab)
-                    </a>
+                    <div className="space-y-2">
+                      {insuranceUrl.match(/\.(jpg|jpeg|png|webp)/) && (
+                        <img src={insuranceUrl} alt="Insurance Certificate" className="max-h-40 rounded border object-contain" />
+                      )}
+                      <a
+                        href={insuranceUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-2 text-sm text-primary hover:underline"
+                      >
+                        <Download className="w-4 h-4" />
+                        Download Certificate
+                      </a>
+                    </div>
                   ) : selectedContractor.insurance_certificate_url ? (
                     <p className="text-muted-foreground text-sm">Loading certificate...</p>
                   ) : (
                     <p className="text-muted-foreground text-sm">No certificate uploaded</p>
                   )}
+
+                  {/* Insurance Expiry Date */}
+                  <div className="space-y-1">
+                    <Label htmlFor="adminInsuranceExpiry" className="text-sm">Insurance Expiry Date</Label>
+                    <Input
+                      id="adminInsuranceExpiry"
+                      type="date"
+                      value={insuranceExpiryDate}
+                      onChange={(e) => setInsuranceExpiryDate(e.target.value)}
+                    />
+                    {insuranceExpiryDate && new Date(insuranceExpiryDate) < new Date() && (
+                      <p className="text-xs text-destructive flex items-center gap-1">
+                        <AlertTriangle className="w-3 h-3" />
+                        Insurance has expired
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Verification Checkbox */}
+                  <div className="flex items-start space-x-3 p-3 bg-muted/50 rounded-lg">
+                    <Checkbox
+                      id="insuranceVerified"
+                      checked={insuranceVerified}
+                      onCheckedChange={(checked) => setInsuranceVerified(checked === true)}
+                    />
+                    <label htmlFor="insuranceVerified" className="text-sm leading-relaxed cursor-pointer">
+                      Insurance certificate verified and adequate (min $5M cover confirmed)
+                    </label>
+                  </div>
                 </div>
 
                 {/* Service Radius */}
@@ -1096,7 +1151,11 @@ const ContractorApplicationsTab = () => {
                 )}
                 Reject
               </Button>
-              <Button onClick={() => handleApproval(true)} disabled={processing}>
+              <Button 
+                onClick={() => handleApproval(true)} 
+                disabled={processing || !insuranceVerified || !insuranceExpiryDate}
+                title={!insuranceVerified || !insuranceExpiryDate ? "Verify insurance and set expiry date before approving" : ""}
+              >
                 {processing ? (
                   <Loader2 className="w-4 h-4 animate-spin mr-2" />
                 ) : (
@@ -1104,6 +1163,11 @@ const ContractorApplicationsTab = () => {
                 )}
                 Approve
               </Button>
+              {(!insuranceVerified || !insuranceExpiryDate) && (
+                <p className="text-xs text-muted-foreground w-full text-right">
+                  ⚠️ Verify insurance and set expiry date to enable approval
+                </p>
+              )}
             </DialogFooter>
           )}
         </DialogContent>

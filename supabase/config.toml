@@ -20,3 +20,6 @@ verify_jwt = false
 
 [functions.check-quality-thresholds]
 verify_jwt = false
+
+[functions.check-insurance-expiry]
+verify_jwt = false

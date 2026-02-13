@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { format, differenceInDays } from "date-fns";
 
 import { User } from "@supabase/supabase-js";
 import { Button } from "@/components/ui/button";
@@ -42,6 +43,9 @@ import {
   Loader2,
   CreditCard,
   CheckCircle,
+  Shield,
+  Upload,
+  FileCheck,
 } from "lucide-react";
 import { toast } from "sonner";
 import type { Database } from "@/integrations/supabase/types";
@@ -72,6 +76,78 @@ interface BookingWithAddress extends Omit<Booking, 'admin_notes' | 'payment_inte
   customerProfile?: Profile;
 }
 
+const InsuranceUploadForm = ({ contractorId, userId, onUpload, isUploading, setIsUploading, expiryInput, setExpiryInput, compact }: {
+  contractorId: string; userId: string; onUpload: () => void;
+  isUploading: boolean; setIsUploading: (v: boolean) => void;
+  expiryInput: string; setExpiryInput: (v: string) => void;
+  compact?: boolean;
+}) => {
+  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const allowedTypes = ["application/pdf", "image/jpeg", "image/png", "image/webp"];
+    if (!allowedTypes.includes(file.type)) { toast.error("Please upload a PDF or image file"); return; }
+    if (file.size > 10 * 1024 * 1024) { toast.error("File must be under 10MB"); return; }
+    if (!expiryInput) { toast.error("Please enter the new expiry date first"); return; }
+
+    setIsUploading(true);
+    try {
+      const fileExt = file.name.split(".").pop();
+      const fileName = `${userId}/insurance-certificate.${fileExt}`;
+      const { error: uploadError } = await supabase.storage.from("contractor-documents").upload(fileName, file, { upsert: true });
+      if (uploadError) throw uploadError;
+
+      const { error } = await supabase.from("contractors").update({
+        insurance_certificate_url: fileName,
+        insurance_expiry_date: expiryInput,
+        insurance_uploaded_at: new Date().toISOString(),
+        insurance_verified: false,
+      }).eq("id", contractorId);
+      if (error) throw error;
+
+      toast.success("Insurance certificate updated! It will be reviewed by our team.");
+      setExpiryInput("");
+      onUpload();
+    } catch (err) {
+      console.error("Upload error:", err);
+      toast.error("Failed to upload certificate");
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  if (compact) {
+    return (
+      <div className="flex items-center gap-2">
+        <input type="date" value={expiryInput} onChange={(e) => setExpiryInput(e.target.value)} min={new Date().toISOString().split("T")[0]} className="text-xs border rounded px-2 py-1 bg-background" />
+        <Button variant="outline" size="sm" disabled={isUploading} asChild>
+          <label className="cursor-pointer gap-1">
+            {isUploading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Upload className="w-3 h-3" />}
+            {isUploading ? "Uploading..." : "Update"}
+            <input type="file" accept=".pdf,.jpg,.jpeg,.png,.webp" className="hidden" onChange={handleUpload} disabled={isUploading} />
+          </label>
+        </Button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-3 flex-wrap">
+      <div className="flex items-center gap-2">
+        <label className="text-xs text-muted-foreground whitespace-nowrap">New Expiry:</label>
+        <input type="date" value={expiryInput} onChange={(e) => setExpiryInput(e.target.value)} min={new Date().toISOString().split("T")[0]} className="text-sm border rounded px-2 py-1 bg-background" />
+      </div>
+      <Button variant="outline" size="sm" disabled={isUploading} asChild>
+        <label className="cursor-pointer gap-2">
+          {isUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+          {isUploading ? "Uploading..." : "Upload Renewed Certificate"}
+          <input type="file" accept=".pdf,.jpg,.jpeg,.png,.webp" className="hidden" onChange={handleUpload} disabled={isUploading} />
+        </label>
+      </Button>
+    </div>
+  );
+};
+
 const timeSlots = [
   { value: "7am-10am", label: "7:00 AM - 10:00 AM" },
   { value: "10am-2pm", label: "10:00 AM - 2:00 PM" },
@@ -91,6 +167,8 @@ const ContractorDashboard = () => {
   const [viewingJob, setViewingJob] = useState<BookingWithAddress | null>(null);
   const [suggestedDate, setSuggestedDate] = useState<Date | undefined>(undefined);
   const [suggestedTimeSlot, setSuggestedTimeSlot] = useState("10am-2pm");
+  const [insuranceUploading, setInsuranceUploading] = useState(false);
+  const [insuranceExpiryInput, setInsuranceExpiryInput] = useState("");
   const [stripeStatus, setStripeStatus] = useState<{
     onboarding_complete: boolean;
     payouts_enabled: boolean;
@@ -568,6 +646,65 @@ const ContractorDashboard = () => {
         {/* Only show dashboard content if approved */}
         {!isPendingApproval && !isRejected && (
           <>
+            {/* Insurance Expiry Info */}
+            {contractor?.insurance_expiry_date && (() => {
+              const daysLeft = differenceInDays(new Date(contractor.insurance_expiry_date), new Date());
+              if (daysLeft <= 0) {
+                return (
+                  <Card className="mb-6 border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-900/20">
+                    <CardContent className="pt-5 pb-4 space-y-3">
+                      <div className="flex items-center gap-3">
+                        <Shield className="w-5 h-5 text-destructive shrink-0" />
+                        <p className="text-sm text-red-800 dark:text-red-200">
+                          <strong>⛔ Insurance Expired:</strong> Your insurance expired on {format(new Date(contractor.insurance_expiry_date), "d MMM yyyy")}. Upload a renewed certificate to continue accepting jobs.
+                        </p>
+                      </div>
+                      <InsuranceUploadForm contractorId={contractor.id} userId={user?.id || ""} onUpload={() => checkContractorAccess()} isUploading={insuranceUploading} setIsUploading={setInsuranceUploading} expiryInput={insuranceExpiryInput} setExpiryInput={setInsuranceExpiryInput} />
+                    </CardContent>
+                  </Card>
+                );
+              }
+              if (daysLeft <= 30) {
+                return (
+                  <Card className="mb-6 border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-900/20">
+                    <CardContent className="pt-5 pb-4 space-y-3">
+                      <div className="flex items-center gap-3">
+                        <Shield className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0" />
+                        <p className="text-sm text-amber-800 dark:text-amber-200">
+                          <strong>⚠️ Insurance Expiring Soon:</strong> Your insurance expires on {format(new Date(contractor.insurance_expiry_date), "d MMM yyyy")} ({daysLeft} days remaining). Please renew before expiry.
+                        </p>
+                      </div>
+                      <InsuranceUploadForm contractorId={contractor.id} userId={user?.id || ""} onUpload={() => checkContractorAccess()} isUploading={insuranceUploading} setIsUploading={setInsuranceUploading} expiryInput={insuranceExpiryInput} setExpiryInput={setInsuranceExpiryInput} />
+                    </CardContent>
+                  </Card>
+                );
+              }
+              return null;
+            })()}
+
+            {/* Insurance Info Card */}
+            {contractor && (
+              <Card className="mb-6">
+                <CardContent className="pt-5 pb-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <Shield className="w-5 h-5 text-primary" />
+                      <div>
+                        <p className="text-sm font-medium">Public Liability Insurance</p>
+                        <p className="text-xs text-muted-foreground">
+                          {contractor.insurance_expiry_date
+                            ? `Expires: ${format(new Date(contractor.insurance_expiry_date), "d MMM yyyy")}`
+                            : "No expiry date set"}
+                          {contractor.insurance_verified && " • ✓ Verified"}
+                        </p>
+                      </div>
+                    </div>
+                    <InsuranceUploadForm contractorId={contractor.id} userId={user?.id || ""} onUpload={() => checkContractorAccess()} isUploading={insuranceUploading} setIsUploading={setInsuranceUploading} expiryInput={insuranceExpiryInput} setExpiryInput={setInsuranceExpiryInput} compact />
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
             {/* Stripe Connect Setup */}
             {!stripeStatus.loading && !stripeStatus.onboarding_complete && (
               <Card className="mb-8 border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-900/20">
