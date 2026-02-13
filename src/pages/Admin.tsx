@@ -35,6 +35,7 @@ import PricingSettingsTab from "@/components/admin/PricingSettingsTab";
 import ContractorApplicationsTab from "@/components/admin/ContractorApplicationsTab";
 import AdminLawnEditorDialog from "@/components/admin/AdminLawnEditorDialog";
 import AdminDisputesTab from "@/components/admin/AdminDisputesTab";
+import AdminBookingPhotosSection from "@/components/admin/AdminBookingPhotosSection";
 import type { Database } from "@/integrations/supabase/types";
 
 // Badge component for pending contractors
@@ -645,7 +646,7 @@ const Admin = () => {
 
       {/* Booking Management Dialog */}
       <Dialog open={bookingDialogOpen} onOpenChange={setBookingDialogOpen}>
-        <DialogContent>
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Manage Booking</DialogTitle>
           </DialogHeader>
@@ -667,6 +668,11 @@ const Admin = () => {
                   {selectedBooking.notes && <p><strong>Customer Notes:</strong> {selectedBooking.notes}</p>}
                 </div>
               </div>
+
+              <AdminBookingPhotosSection
+                bookingId={selectedBooking.id}
+                contractorId={selectedBooking.contractor_id}
+              />
 
               <div className="flex gap-3 justify-end flex-wrap">
                 {selectedBooking.status === "pending" && (
