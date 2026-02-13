@@ -480,6 +480,7 @@ const ContractorApplicationsTab = () => {
                       <TableHead>Email</TableHead>
                       <TableHead>Business</TableHead>
                       <TableHead>Phone</TableHead>
+                      <TableHead>Avg Rating</TableHead>
                       <TableHead>Service Radius</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead>Actions</TableHead>
@@ -496,6 +497,12 @@ const ContractorApplicationsTab = () => {
                         </TableCell>
                         <TableCell>{contractor.business_name || "-"}</TableCell>
                         <TableCell>{contractor.phone || contractor.profilePhone || "-"}</TableCell>
+                        <TableCell>
+                          {contractor.average_rating
+                            ? <span className="font-medium">{contractor.average_rating} ⭐</span>
+                            : <span className="text-muted-foreground">-</span>
+                          }
+                        </TableCell>
                         <TableCell>
                           {contractor.service_radius_km ? `${contractor.service_radius_km} km` : "-"}
                         </TableCell>

@@ -53,6 +53,25 @@ serve(async (req) => {
       try {
         logStep("Processing booking", { bookingId: booking.id });
 
+        // Auto-rate as 5 stars if no rating submitted
+        const { data: bookingDetail } = await supabase
+          .from("bookings")
+          .select("customer_rating")
+          .eq("id", booking.id)
+          .single();
+
+        if (bookingDetail && !bookingDetail.customer_rating) {
+          await supabase
+            .from("bookings")
+            .update({
+              customer_rating: 5,
+              rating_comment: "Auto-rated: no review submitted within 48 hours",
+              rating_submitted_at: new Date().toISOString(),
+            })
+            .eq("id", booking.id);
+          logStep("Auto-rated 5 stars", { bookingId: booking.id });
+        }
+
         // 2. Call release-payout
         const payoutResponse = await fetch(
           `${supabaseUrl}/functions/v1/release-payout`,

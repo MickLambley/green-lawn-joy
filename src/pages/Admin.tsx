@@ -30,7 +30,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
-import { Leaf, LogOut, MapPin, Calendar, Check, X, Eye, Settings, Users, PenTool, AlertTriangle } from "lucide-react";
+import { Leaf, LogOut, MapPin, Calendar, Check, X, Eye, Settings, Users, PenTool, AlertTriangle, Star } from "lucide-react";
 import PricingSettingsTab from "@/components/admin/PricingSettingsTab";
 import ContractorApplicationsTab from "@/components/admin/ContractorApplicationsTab";
 import AdminLawnEditorDialog from "@/components/admin/AdminLawnEditorDialog";
@@ -513,7 +513,14 @@ const Admin = () => {
                           <TableCell>
                             {booking.total_price ? `$${booking.total_price}` : "-"}
                           </TableCell>
-                          <TableCell>{getStatusBadge(booking.status)}</TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-1">
+                              {getStatusBadge(booking.status)}
+                              {booking.customer_rating && booking.customer_rating <= 3 && (
+                                <Badge variant="destructive" className="text-[10px]">⚠ {booking.customer_rating}★</Badge>
+                              )}
+                            </div>
+                          </TableCell>
                           <TableCell>
                             <Button
                               variant="outline"
@@ -666,6 +673,25 @@ const Admin = () => {
                   <p><strong>Total Price:</strong> {selectedBooking.total_price ? `$${selectedBooking.total_price}` : "Not set"}</p>
                   <p><strong>Status:</strong> {getStatusBadge(selectedBooking.status)}</p>
                   {selectedBooking.notes && <p><strong>Customer Notes:</strong> {selectedBooking.notes}</p>}
+                  {selectedBooking.customer_rating && (
+                    <div className="flex items-center gap-2 pt-1">
+                      <strong>Rating:</strong>
+                      <span className="flex gap-0.5">
+                        {[1,2,3,4,5].map(s => (
+                          <Star key={s} className={`w-4 h-4 ${s <= (selectedBooking.customer_rating || 0) ? "text-yellow-400 fill-yellow-400" : "text-muted-foreground/20"}`} />
+                        ))}
+                      </span>
+                      {selectedBooking.customer_rating <= 3 && (
+                        <Badge variant="destructive" className="text-[10px]">Low Rating</Badge>
+                      )}
+                    </div>
+                  )}
+                  {selectedBooking.rating_comment && (
+                    <p><strong>Rating Comment:</strong> {selectedBooking.rating_comment}</p>
+                  )}
+                  {selectedBooking.contractor_rating_response && (
+                    <p><strong>Contractor Response:</strong> {selectedBooking.contractor_rating_response}</p>
+                  )}
                 </div>
               </div>
 
