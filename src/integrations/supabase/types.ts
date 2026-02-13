@@ -141,6 +141,9 @@ export type Database = {
           completed_at: string | null
           contractor_accepted_at: string | null
           contractor_id: string | null
+          contractor_issue_notes: string | null
+          contractor_issue_photos: string[] | null
+          contractor_issues: Json | null
           contractor_rating_response: string | null
           created_at: string
           customer_rating: number | null
@@ -179,6 +182,9 @@ export type Database = {
           completed_at?: string | null
           contractor_accepted_at?: string | null
           contractor_id?: string | null
+          contractor_issue_notes?: string | null
+          contractor_issue_photos?: string[] | null
+          contractor_issues?: Json | null
           contractor_rating_response?: string | null
           created_at?: string
           customer_rating?: number | null
@@ -217,6 +223,9 @@ export type Database = {
           completed_at?: string | null
           contractor_accepted_at?: string | null
           contractor_id?: string | null
+          contractor_issue_notes?: string | null
+          contractor_issue_photos?: string[] | null
+          contractor_issues?: Json | null
           contractor_rating_response?: string | null
           created_at?: string
           customer_rating?: number | null
@@ -728,6 +737,7 @@ export type Database = {
         | "completed_pending_verification"
         | "disputed"
         | "post_payment_dispute"
+        | "completed_with_issues"
       contractor_tier: "probation" | "standard" | "premium"
       slope_type: "flat" | "mild" | "steep"
     }
@@ -867,6 +877,7 @@ export const Constants = {
         "completed_pending_verification",
         "disputed",
         "post_payment_dispute",
+        "completed_with_issues",
       ],
       contractor_tier: ["probation", "standard", "premium"],
       slope_type: ["flat", "mild", "steep"],
