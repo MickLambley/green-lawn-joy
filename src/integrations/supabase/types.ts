@@ -280,6 +280,8 @@ export type Database = {
           is_active: boolean
           last_active_at: string | null
           phone: string | null
+          quality_reviews: Json
+          quality_warnings: Json
           questionnaire_responses: Json | null
           service_areas: string[]
           service_center_lat: number | null
@@ -288,6 +290,9 @@ export type Database = {
           stripe_account_id: string | null
           stripe_onboarding_complete: boolean
           stripe_payouts_enabled: boolean
+          suspended_at: string | null
+          suspension_reason: string | null
+          suspension_status: string
           tier: Database["public"]["Enums"]["contractor_tier"]
           total_ratings_count: number | null
           total_revenue: number
@@ -313,6 +318,8 @@ export type Database = {
           is_active?: boolean
           last_active_at?: string | null
           phone?: string | null
+          quality_reviews?: Json
+          quality_warnings?: Json
           questionnaire_responses?: Json | null
           service_areas?: string[]
           service_center_lat?: number | null
@@ -321,6 +328,9 @@ export type Database = {
           stripe_account_id?: string | null
           stripe_onboarding_complete?: boolean
           stripe_payouts_enabled?: boolean
+          suspended_at?: string | null
+          suspension_reason?: string | null
+          suspension_status?: string
           tier?: Database["public"]["Enums"]["contractor_tier"]
           total_ratings_count?: number | null
           total_revenue?: number
@@ -346,6 +356,8 @@ export type Database = {
           is_active?: boolean
           last_active_at?: string | null
           phone?: string | null
+          quality_reviews?: Json
+          quality_warnings?: Json
           questionnaire_responses?: Json | null
           service_areas?: string[]
           service_center_lat?: number | null
@@ -354,6 +366,9 @@ export type Database = {
           stripe_account_id?: string | null
           stripe_onboarding_complete?: boolean
           stripe_payouts_enabled?: boolean
+          suspended_at?: string | null
+          suspension_reason?: string | null
+          suspension_status?: string
           tier?: Database["public"]["Enums"]["contractor_tier"]
           total_ratings_count?: number | null
           total_revenue?: number
