@@ -67,8 +67,8 @@ serve(async (req) => {
     const beforeCount = photos?.filter(p => p.photo_type === "before").length || 0;
     const afterCount = photos?.filter(p => p.photo_type === "after").length || 0;
 
-    if (beforeCount < 1 || afterCount < 1) {
-      throw new Error("Minimum photos not uploaded");
+    if (beforeCount < 4 || afterCount < 4) {
+      throw new Error(`Minimum 4 before and 4 after photos required. You have ${beforeCount} before and ${afterCount} after.`);
     }
 
     logStep("Photos verified", { beforeCount, afterCount });
