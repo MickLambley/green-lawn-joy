@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -29,6 +29,13 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -36,12 +43,17 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   Eye, Check, X, FileText, Clock, MapPin, Wrench, Loader2, User,
-  Edit, Trash2, Ban, UserCheck, Users 
+  Edit, Trash2, Ban, UserCheck, Users, ArrowUpDown, ChevronUp, ChevronDown,
+  BarChart3, Filter,
 } from "lucide-react";
 import { toast } from "sonner";
+import ContractorPerformanceTab from "./ContractorPerformanceTab";
 import type { Database } from "@/integrations/supabase/types";
 
 type Contractor = Database["public"]["Tables"]["contractors"]["Row"];
+
+type SortField = "profileName" | "completed_jobs_count" | "average_rating" | "completionRate" | "disputeRate" | "last_active_at";
+type SortDir = "asc" | "desc";
 
 interface ContractorWithProfile extends Contractor {
   profileName?: string;
@@ -105,6 +117,13 @@ const ContractorApplicationsTab = () => {
   const [editPhone, setEditPhone] = useState("");
   const [editServiceAreas, setEditServiceAreas] = useState("");
   const [editServiceRadius, setEditServiceRadius] = useState("");
+
+  // Sorting & filtering
+  const [sortField, setSortField] = useState<SortField>("completed_jobs_count");
+  const [sortDir, setSortDir] = useState<SortDir>("desc");
+  const [filterTier, setFilterTier] = useState<string>("all");
+  const [filterMinRating, setFilterMinRating] = useState<string>("all");
+  const [filterMaxDispute, setFilterMaxDispute] = useState<string>("all");
 
   useEffect(() => {
     fetchContractors();
@@ -363,8 +382,95 @@ const ContractorApplicationsTab = () => {
   };
 
   const pendingApplications = contractors.filter((c) => c.approval_status === "pending");
-  const activeContractors = contractors.filter((c) => c.approval_status === "approved");
   const rejectedApplications = contractors.filter((c) => c.approval_status === "rejected");
+
+  const getCompletionRate = (c: ContractorWithProfile) => {
+    const total = (c.completed_jobs_count || 0) + (c.cancelled_jobs_count || 0);
+    return total > 0 ? Math.round(((c.completed_jobs_count || 0) / total) * 100) : 100;
+  };
+
+  const getDisputeRate = (c: ContractorWithProfile) => {
+    return (c.completed_jobs_count || 0) > 0
+      ? Math.round(((c.disputed_jobs_count || 0) / (c.completed_jobs_count || 0)) * 100)
+      : 0;
+  };
+
+  const formatRelativeTime = (dateStr: string | null) => {
+    if (!dateStr) return "-";
+    const diff = Date.now() - new Date(dateStr).getTime();
+    const hours = Math.floor(diff / (1000 * 60 * 60));
+    if (hours < 1) return "< 1h ago";
+    if (hours < 24) return `${hours}h ago`;
+    const days = Math.floor(hours / 24);
+    if (days < 30) return `${days}d ago`;
+    const months = Math.floor(days / 30);
+    return `${months}mo ago`;
+  };
+
+  const activeContractors = useMemo(() => {
+    let list = contractors.filter((c) => c.approval_status === "approved");
+
+    // Apply filters
+    if (filterTier !== "all") list = list.filter((c) => c.tier === filterTier);
+    if (filterMinRating !== "all") {
+      const min = parseFloat(filterMinRating);
+      list = list.filter((c) => (c.average_rating || 0) >= min);
+    }
+    if (filterMaxDispute !== "all") {
+      const max = parseFloat(filterMaxDispute);
+      list = list.filter((c) => getDisputeRate(c) <= max);
+    }
+
+    // Apply sorting
+    list.sort((a, b) => {
+      let valA: number | string = 0;
+      let valB: number | string = 0;
+
+      switch (sortField) {
+        case "profileName":
+          valA = (a.profileName || "").toLowerCase();
+          valB = (b.profileName || "").toLowerCase();
+          return sortDir === "asc" ? (valA < valB ? -1 : 1) : (valA > valB ? -1 : 1);
+        case "completed_jobs_count":
+          valA = a.completed_jobs_count || 0;
+          valB = b.completed_jobs_count || 0;
+          break;
+        case "average_rating":
+          valA = Number(a.average_rating || 0);
+          valB = Number(b.average_rating || 0);
+          break;
+        case "completionRate":
+          valA = getCompletionRate(a);
+          valB = getCompletionRate(b);
+          break;
+        case "disputeRate":
+          valA = getDisputeRate(a);
+          valB = getDisputeRate(b);
+          break;
+        case "last_active_at":
+          valA = a.last_active_at ? new Date(a.last_active_at).getTime() : 0;
+          valB = b.last_active_at ? new Date(b.last_active_at).getTime() : 0;
+          break;
+      }
+      return sortDir === "asc" ? (valA as number) - (valB as number) : (valB as number) - (valA as number);
+    });
+
+    return list;
+  }, [contractors, sortField, sortDir, filterTier, filterMinRating, filterMaxDispute]);
+
+  const toggleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortField(field);
+      setSortDir("desc");
+    }
+  };
+
+  const SortIcon = ({ field }: { field: SortField }) => {
+    if (sortField !== field) return <ArrowUpDown className="w-3 h-3 ml-1 opacity-40" />;
+    return sortDir === "asc" ? <ChevronUp className="w-3 h-3 ml-1" /> : <ChevronDown className="w-3 h-3 ml-1" />;
+  };
 
   if (loading) {
     return (
@@ -467,44 +573,117 @@ const ContractorApplicationsTab = () => {
                 Active Contractors
               </CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="space-y-4">
+              {/* Filters */}
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="flex items-center gap-1.5">
+                  <Filter className="w-4 h-4 text-muted-foreground" />
+                  <span className="text-sm text-muted-foreground">Filters:</span>
+                </div>
+                <Select value={filterTier} onValueChange={setFilterTier}>
+                  <SelectTrigger className="w-[130px] h-8 text-xs">
+                    <SelectValue placeholder="Tier" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Tiers</SelectItem>
+                    <SelectItem value="probation">New</SelectItem>
+                    <SelectItem value="standard">Verified</SelectItem>
+                    <SelectItem value="premium">Premium</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Select value={filterMinRating} onValueChange={setFilterMinRating}>
+                  <SelectTrigger className="w-[140px] h-8 text-xs">
+                    <SelectValue placeholder="Min Rating" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Any Rating</SelectItem>
+                    <SelectItem value="4.5">4.5+ ⭐</SelectItem>
+                    <SelectItem value="4.0">4.0+ ⭐</SelectItem>
+                    <SelectItem value="3.5">3.5+ ⭐</SelectItem>
+                    <SelectItem value="3.0">3.0+ ⭐</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Select value={filterMaxDispute} onValueChange={setFilterMaxDispute}>
+                  <SelectTrigger className="w-[160px] h-8 text-xs">
+                    <SelectValue placeholder="Max Dispute %" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Any Dispute %</SelectItem>
+                    <SelectItem value="3">≤ 3% Disputes</SelectItem>
+                    <SelectItem value="5">≤ 5% Disputes</SelectItem>
+                    <SelectItem value="10">≤ 10% Disputes</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
               {activeContractors.length === 0 ? (
                 <p className="text-muted-foreground text-center py-8">
                   No active contractors.
                 </p>
               ) : (
+                <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Name</TableHead>
-                      <TableHead>Email</TableHead>
-                      <TableHead>Business</TableHead>
-                      <TableHead>Phone</TableHead>
-                      <TableHead>Avg Rating</TableHead>
-                      <TableHead>Service Radius</TableHead>
+                      <TableHead className="cursor-pointer select-none" onClick={() => toggleSort("profileName")}>
+                        <span className="flex items-center">Name<SortIcon field="profileName" /></span>
+                      </TableHead>
+                      <TableHead>Tier</TableHead>
+                      <TableHead className="cursor-pointer select-none" onClick={() => toggleSort("completed_jobs_count")}>
+                        <span className="flex items-center">Jobs<SortIcon field="completed_jobs_count" /></span>
+                      </TableHead>
+                      <TableHead className="cursor-pointer select-none" onClick={() => toggleSort("average_rating")}>
+                        <span className="flex items-center">Avg Rating<SortIcon field="average_rating" /></span>
+                      </TableHead>
+                      <TableHead className="cursor-pointer select-none" onClick={() => toggleSort("completionRate")}>
+                        <span className="flex items-center">Completion<SortIcon field="completionRate" /></span>
+                      </TableHead>
+                      <TableHead className="cursor-pointer select-none" onClick={() => toggleSort("disputeRate")}>
+                        <span className="flex items-center">Disputes<SortIcon field="disputeRate" /></span>
+                      </TableHead>
+                      <TableHead className="cursor-pointer select-none" onClick={() => toggleSort("last_active_at")}>
+                        <span className="flex items-center">Last Active<SortIcon field="last_active_at" /></span>
+                      </TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead>Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {activeContractors.map((contractor) => (
+                    {activeContractors.map((contractor) => {
+                      const compRate = getCompletionRate(contractor);
+                      const dispRate = getDisputeRate(contractor);
+                      return (
                       <TableRow key={contractor.id}>
                         <TableCell className="font-medium">
-                          {contractor.profileName}
+                          <div>
+                            {contractor.profileName}
+                            {contractor.business_name && (
+                              <p className="text-xs text-muted-foreground">{contractor.business_name}</p>
+                            )}
+                          </div>
                         </TableCell>
-                        <TableCell className="text-muted-foreground">
-                          {contractor.email || (emailsLoading ? "..." : "-")}
-                        </TableCell>
-                        <TableCell>{contractor.business_name || "-"}</TableCell>
-                        <TableCell>{contractor.phone || contractor.profilePhone || "-"}</TableCell>
                         <TableCell>
-                          {contractor.average_rating
+                          <Badge variant="outline" className="text-xs">
+                            {{ probation: "New", standard: "Verified", premium: "Premium" }[contractor.tier] || contractor.tier}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="font-medium">{contractor.completed_jobs_count || 0}</TableCell>
+                        <TableCell>
+                          {Number(contractor.average_rating || 0) > 0
                             ? <span className="font-medium">{contractor.average_rating} ⭐</span>
                             : <span className="text-muted-foreground">-</span>
                           }
                         </TableCell>
                         <TableCell>
-                          {contractor.service_radius_km ? `${contractor.service_radius_km} km` : "-"}
+                          <span className={compRate < 90 ? "text-destructive font-medium" : ""}>{compRate}%</span>
+                        </TableCell>
+                        <TableCell>
+                          <span className={dispRate > 5 ? "text-destructive font-medium" : ""}>
+                            {dispRate}%{dispRate > 5 ? " ⚠️" : ""}
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-sm text-muted-foreground">
+                          {formatRelativeTime(contractor.last_active_at)}
                         </TableCell>
                         <TableCell>
                           {getStatusBadge(contractor.approval_status, contractor.is_active)}
@@ -550,9 +729,11 @@ const ContractorApplicationsTab = () => {
                           </div>
                         </TableCell>
                       </TableRow>
-                    ))}
+                      );
+                    })}
                   </TableBody>
                 </Table>
+                </div>
               )}
             </CardContent>
           </Card>
@@ -625,7 +806,7 @@ const ContractorApplicationsTab = () => {
 
       {/* Review Dialog */}
       <Dialog open={reviewDialogOpen} onOpenChange={setReviewDialogOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh]">
+        <DialogContent className="max-w-3xl max-h-[90vh]">
           <DialogHeader>
             <DialogTitle>
               {selectedContractor?.approval_status === "pending" 
@@ -635,8 +816,19 @@ const ContractorApplicationsTab = () => {
           </DialogHeader>
 
           {selectedContractor && (
-            <ScrollArea className="max-h-[60vh] pr-4">
-              <div className="space-y-6">
+            <Tabs defaultValue="details" className="space-y-4">
+              {selectedContractor.approval_status !== "pending" && (
+                <TabsList>
+                  <TabsTrigger value="details">Details</TabsTrigger>
+                  <TabsTrigger value="performance" className="flex items-center gap-1">
+                    <BarChart3 className="w-3.5 h-3.5" />
+                    Performance
+                  </TabsTrigger>
+                </TabsList>
+              )}
+              <TabsContent value="details">
+                <ScrollArea className="max-h-[55vh] pr-4">
+                  <div className="space-y-6">
                 {/* Basic Info */}
                 <div className="grid grid-cols-2 gap-4">
                   <div>
@@ -880,7 +1072,14 @@ const ContractorApplicationsTab = () => {
                   </div>
                 )}
               </div>
-            </ScrollArea>
+                </ScrollArea>
+              </TabsContent>
+              <TabsContent value="performance">
+                <ScrollArea className="max-h-[55vh] pr-4">
+                  <ContractorPerformanceTab contractor={selectedContractor} />
+                </ScrollArea>
+              </TabsContent>
+            </Tabs>
           )}
 
           {selectedContractor?.approval_status === "pending" && (

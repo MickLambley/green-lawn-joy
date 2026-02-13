@@ -268,12 +268,17 @@ export type Database = {
           approved_at: string | null
           approved_by: string | null
           average_rating: number | null
+          average_response_time_hours: number | null
           business_address: string | null
           business_name: string | null
+          cancelled_jobs_count: number
+          completed_jobs_count: number
           created_at: string
+          disputed_jobs_count: number
           id: string
           insurance_certificate_url: string | null
           is_active: boolean
+          last_active_at: string | null
           phone: string | null
           questionnaire_responses: Json | null
           service_areas: string[]
@@ -285,6 +290,7 @@ export type Database = {
           stripe_payouts_enabled: boolean
           tier: Database["public"]["Enums"]["contractor_tier"]
           total_ratings_count: number | null
+          total_revenue: number
           updated_at: string
           user_id: string
         }
@@ -295,12 +301,17 @@ export type Database = {
           approved_at?: string | null
           approved_by?: string | null
           average_rating?: number | null
+          average_response_time_hours?: number | null
           business_address?: string | null
           business_name?: string | null
+          cancelled_jobs_count?: number
+          completed_jobs_count?: number
           created_at?: string
+          disputed_jobs_count?: number
           id?: string
           insurance_certificate_url?: string | null
           is_active?: boolean
+          last_active_at?: string | null
           phone?: string | null
           questionnaire_responses?: Json | null
           service_areas?: string[]
@@ -312,6 +323,7 @@ export type Database = {
           stripe_payouts_enabled?: boolean
           tier?: Database["public"]["Enums"]["contractor_tier"]
           total_ratings_count?: number | null
+          total_revenue?: number
           updated_at?: string
           user_id: string
         }
@@ -322,12 +334,17 @@ export type Database = {
           approved_at?: string | null
           approved_by?: string | null
           average_rating?: number | null
+          average_response_time_hours?: number | null
           business_address?: string | null
           business_name?: string | null
+          cancelled_jobs_count?: number
+          completed_jobs_count?: number
           created_at?: string
+          disputed_jobs_count?: number
           id?: string
           insurance_certificate_url?: string | null
           is_active?: boolean
+          last_active_at?: string | null
           phone?: string | null
           questionnaire_responses?: Json | null
           service_areas?: string[]
@@ -339,6 +356,7 @@ export type Database = {
           stripe_payouts_enabled?: boolean
           tier?: Database["public"]["Enums"]["contractor_tier"]
           total_ratings_count?: number | null
+          total_revenue?: number
           updated_at?: string
           user_id?: string
         }
