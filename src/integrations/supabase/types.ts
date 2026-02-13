@@ -394,6 +394,7 @@ export type Database = {
           created_at: string
           customer_photos: string[] | null
           description: string
+          dispute_reason: string | null
           id: string
           raised_by: string
           refund_percentage: number | null
@@ -401,6 +402,7 @@ export type Database = {
           resolved_at: string | null
           resolved_by: string | null
           status: string
+          suggested_refund_amount: number | null
         }
         Insert: {
           booking_id: string
@@ -409,6 +411,7 @@ export type Database = {
           created_at?: string
           customer_photos?: string[] | null
           description: string
+          dispute_reason?: string | null
           id?: string
           raised_by: string
           refund_percentage?: number | null
@@ -416,6 +419,7 @@ export type Database = {
           resolved_at?: string | null
           resolved_by?: string | null
           status?: string
+          suggested_refund_amount?: number | null
         }
         Update: {
           booking_id?: string
@@ -424,6 +428,7 @@ export type Database = {
           created_at?: string
           customer_photos?: string[] | null
           description?: string
+          dispute_reason?: string | null
           id?: string
           raised_by?: string
           refund_percentage?: number | null
@@ -431,6 +436,7 @@ export type Database = {
           resolved_at?: string | null
           resolved_by?: string | null
           status?: string
+          suggested_refund_amount?: number | null
         }
         Relationships: [
           {

@@ -56,6 +56,8 @@ interface Dispute {
   resolved_at: string | null;
   resolved_by: string | null;
   created_at: string;
+  dispute_reason: string | null;
+  suggested_refund_amount: number | null;
 }
 
 interface DisputeWithDetails extends Dispute {
@@ -77,6 +79,14 @@ interface DisputeWithDetails extends Dispute {
   addressDetails: string;
   isPostPayment: boolean;
 }
+
+const REASON_LABELS: Record<string, string> = {
+  poor_quality: "Poor Quality",
+  partial_completion: "Partial Completion",
+  property_damage: "Property Damage",
+  no_show: "No Show",
+  other: "Other",
+};
 
 interface ContractorStats {
   totalJobs: number;
@@ -324,16 +334,24 @@ const AdminDisputesTab = () => {
                 <TableHead>Job ID</TableHead>
                 <TableHead>Customer</TableHead>
                 <TableHead>Contractor</TableHead>
-                <TableHead>Job Date</TableHead>
+                <TableHead>Reason</TableHead>
                 <TableHead>Price</TableHead>
-                <TableHead>Type</TableHead>
+                <TableHead>Suggested Refund</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Days</TableHead>
                 <TableHead>Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {disputes.map(d => (
+              {disputes.map(d => {
+                const reasonLabels: Record<string, string> = {
+                  poor_quality: "Poor Quality",
+                  partial_completion: "Partial Completion",
+                  property_damage: "Property Damage",
+                  no_show: "No Show",
+                  other: "Other",
+                };
+                return (
                 <TableRow key={d.id}>
                   <TableCell className="font-mono text-xs">
                     #{d.booking_id.slice(0, 8)}
@@ -343,10 +361,16 @@ const AdminDisputesTab = () => {
                   </TableCell>
                   <TableCell>{d.customerName}</TableCell>
                   <TableCell>{d.contractorName}</TableCell>
-                  <TableCell>{new Date(d.bookingDate).toLocaleDateString("en-AU", { day: "numeric", month: "short" })}</TableCell>
+                  <TableCell>
+                    <Badge variant="outline" className="text-xs">
+                      {d.dispute_reason ? reasonLabels[d.dispute_reason] || d.dispute_reason : "—"}
+                    </Badge>
+                  </TableCell>
                   <TableCell>${d.bookingPrice.toFixed(2)}</TableCell>
                   <TableCell>
-                    <Badge variant="outline" className="text-xs">Customer</Badge>
+                    {d.suggested_refund_amount != null && d.suggested_refund_amount > 0
+                      ? <span className="font-medium text-destructive">${Number(d.suggested_refund_amount).toFixed(2)}</span>
+                      : <span className="text-muted-foreground">—</span>}
                   </TableCell>
                   <TableCell>
                     <Badge variant={d.status === "resolved" ? "default" : "secondary"}>
@@ -360,7 +384,8 @@ const AdminDisputesTab = () => {
                     </Button>
                   </TableCell>
                 </TableRow>
-              ))}
+                );
+              })}
             </TableBody>
           </Table>
         </div>
@@ -442,6 +467,18 @@ const AdminDisputesTab = () => {
                   <Card>
                     <CardHeader className="pb-2"><CardTitle className="text-sm">Customer's Complaint</CardTitle></CardHeader>
                     <CardContent className="space-y-3">
+                      {selectedDispute.dispute_reason && (
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-muted-foreground">Reason:</span>
+                          <Badge variant="outline">{REASON_LABELS[selectedDispute.dispute_reason] || selectedDispute.dispute_reason}</Badge>
+                        </div>
+                      )}
+                      {selectedDispute.suggested_refund_amount != null && selectedDispute.suggested_refund_amount > 0 && (
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-muted-foreground">Suggested Refund:</span>
+                          <span className="font-semibold text-destructive">${Number(selectedDispute.suggested_refund_amount).toFixed(2)}</span>
+                        </div>
+                      )}
                       <p className="text-sm whitespace-pre-wrap">{selectedDispute.description}</p>
                       {selectedDispute.customer_photos && selectedDispute.customer_photos.length > 0 && (
                         <div>
