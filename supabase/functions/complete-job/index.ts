@@ -43,7 +43,7 @@ serve(async (req) => {
 
     if (!contractor) throw new Error("Contractor profile not found");
 
-    const { bookingId } = await req.json();
+    const { bookingId, issues, issueNotes, issuePhotoUrls } = await req.json();
     if (!bookingId) throw new Error("Missing bookingId");
 
     // Fetch booking
@@ -73,20 +73,33 @@ serve(async (req) => {
 
     logStep("Photos verified", { beforeCount, afterCount });
 
-    // Update booking
+    const hasIssues = Array.isArray(issues) && issues.length > 0;
+
+    // Determine status based on issues
     const now = new Date().toISOString();
+    const newStatus = hasIssues ? "completed_with_issues" : "completed_pending_verification";
+
+    const updateData: Record<string, unknown> = {
+      status: newStatus,
+      completed_at: now,
+      payout_status: hasIssues ? "frozen" : "pending",
+    };
+
+    // Store issue data if present
+    if (hasIssues) {
+      updateData.contractor_issues = issues;
+      updateData.contractor_issue_notes = issueNotes ? JSON.stringify(issueNotes) : null;
+      updateData.contractor_issue_photos = issuePhotoUrls || null;
+    }
+
     const { error: updateError } = await supabase
       .from("bookings")
-      .update({
-        status: "completed_pending_verification",
-        completed_at: now,
-        payout_status: "pending",
-      })
+      .update(updateData)
       .eq("id", bookingId);
 
     if (updateError) throw new Error(`Failed to update booking: ${updateError.message}`);
 
-    logStep("Booking updated to completed_pending_verification");
+    logStep(`Booking updated to ${newStatus}`, { hasIssues });
 
     // Fetch data for emails
     const [addressResult, customerProfileResult, contractorProfileResult, customerAuthResult] = await Promise.all([
@@ -106,99 +119,181 @@ serve(async (req) => {
       weekday: "long", year: "numeric", month: "long", day: "numeric",
     });
 
-    // Send notifications
-    await Promise.all([
-      supabase.from("notifications").insert({
-        user_id: booking.user_id,
-        title: "Your Lawn Has Been Mowed! 🌿",
-        message: `${contractorName} has completed your job. Please review the before/after photos and approve the payment.`,
-        type: "success",
-        booking_id: bookingId,
-      }),
-      supabase.from("notifications").insert({
-        user_id: userId,
-        title: "Job Marked Complete",
-        message: `Your job at ${address?.street_address || "the property"} is marked complete. Payment will be released after customer approval or automatically in 48 hours.`,
-        type: "info",
-        booking_id: bookingId,
-      }),
-    ]);
+    if (hasIssues) {
+      // Notify admins about the reported issues
+      const { data: adminRoles } = await supabase
+        .from("user_roles")
+        .select("user_id")
+        .eq("role", "admin");
 
-    // Send emails (non-blocking)
-    try {
-      const resendApiKey = Deno.env.get("RESEND_API_KEY");
-      if (resendApiKey) {
-        const emailPromises = [];
+      const issueLabels: Record<string, string> = {
+        partial_access: "Partial Access",
+        dog_in_yard: "Dog in Yard",
+        weather_interruption: "Weather Interruption",
+        equipment_failure: "Equipment Failure",
+        unexpected_condition: "Unexpected Property Condition",
+        incorrect_property_info: "Incorrect Property Information",
+        pricing_error: "Error in Pricing",
+        other: "Other",
+      };
 
-        // Customer email
-        if (customerEmail) {
-          emailPromises.push(
-            fetch("https://api.resend.com/emails", {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${resendApiKey}`,
-              },
-              body: JSON.stringify({
-                from: "Lawn Care <onboarding@resend.dev>",
-                to: [customerEmail],
-                subject: "Your Lawn Has Been Mowed! 🌿 Review Photos",
-                html: `
-                  <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto;">
-                    <h1 style="color: #16a34a;">Your Lawn Has Been Mowed! 🌿</h1>
-                    <p>Hi ${customerName},</p>
-                    <p>${contractorName} has completed your lawn mowing job. Before and after photos have been uploaded for your review.</p>
-                    <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
-                      <p style="margin: 5px 0;"><strong>Address:</strong> ${address?.street_address}, ${address?.city}, ${address?.state}</p>
-                      <p style="margin: 5px 0;"><strong>Date:</strong> ${dateFormatted}</p>
-                      <p style="margin: 5px 0;"><strong>Amount:</strong> $${Number(booking.total_price).toFixed(2)}</p>
-                    </div>
-                    <p>Please review the photos and approve the payment. If you don't respond, payment will be automatically released in 48 hours.</p>
-                    <p style="color: #666; margin-top: 30px;">Best regards,<br>The Lawnly Team</p>
-                  </div>
-                `,
-              }),
-            })
-          );
-        }
+      const issueList = (issues as string[]).map(k => issueLabels[k] || k).join(", ");
 
-        // Contractor email
-        if (contractorEmail) {
-          emailPromises.push(
-            fetch("https://api.resend.com/emails", {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${resendApiKey}`,
-              },
-              body: JSON.stringify({
-                from: "Lawn Care <onboarding@resend.dev>",
-                to: [contractorEmail],
-                subject: "Job Marked Complete ✓",
-                html: `
-                  <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto;">
-                    <h1 style="color: #16a34a;">Job Marked Complete ✓</h1>
-                    <p>Hi ${contractorName},</p>
-                    <p>Your job has been marked as complete. The customer has been notified to review your work.</p>
-                    <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
-                      <p style="margin: 5px 0;"><strong>Address:</strong> ${address?.street_address}, ${address?.city}, ${address?.state}</p>
-                      <p style="margin: 5px 0;"><strong>Date:</strong> ${dateFormatted}</p>
-                      <p style="margin: 5px 0;"><strong>Amount:</strong> $${Number(booking.total_price).toFixed(2)}</p>
-                    </div>
-                    <p>Payment will be released after customer approval or automatically in 48 hours.</p>
-                    <p style="color: #666; margin-top: 30px;">Best regards,<br>The Lawnly Team</p>
-                  </div>
-                `,
-              }),
-            })
-          );
-        }
+      if (adminRoles && adminRoles.length > 0) {
+        const adminNotifications = adminRoles.map(admin => ({
+          user_id: admin.user_id,
+          title: "⚠️ Job Completed with Issues",
+          message: `${contractorName} reported issues on Job #${bookingId.slice(0, 8)}: ${issueList}. Payment is frozen pending review.`,
+          type: "warning",
+          booking_id: bookingId,
+        }));
 
-        await Promise.all(emailPromises);
-        logStep("Emails sent");
+        await supabase.from("notifications").insert(adminNotifications);
       }
-    } catch (emailError) {
-      logStep("Email sending failed (non-blocking)", { error: String(emailError) });
+
+      // Notify contractor
+      await supabase.from("notifications").insert({
+        user_id: userId,
+        title: "Job Completed - Issues Reported",
+        message: `Your job at ${address?.street_address || "the property"} is marked complete with reported issues. Admin will review and may adjust payment.`,
+        type: "warning",
+        booking_id: bookingId,
+      });
+
+      // Send admin email
+      try {
+        const resendApiKey = Deno.env.get("RESEND_API_KEY");
+        if (resendApiKey) {
+          const notesHtml = issueNotes ? Object.entries(issueNotes as Record<string, string>)
+            .map(([k, v]) => `<li><strong>${issueLabels[k] || k}:</strong> ${v}</li>`)
+            .join("") : "";
+
+          await fetch("https://api.resend.com/emails", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${resendApiKey}`,
+            },
+            body: JSON.stringify({
+              from: "Lawn Care <onboarding@resend.dev>",
+              to: ["admin@lawnly.com.au"],
+              subject: `⚠️ Job #${bookingId.slice(0, 8)} Completed with Issues - Review Required`,
+              html: `
+                <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto;">
+                  <h1 style="color: #d97706;">⚠️ Job Completed with Issues</h1>
+                  <p>A contractor has reported issues while completing a job. Payment is frozen pending your review.</p>
+                  <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
+                    <p style="margin: 5px 0;"><strong>Job:</strong> #${bookingId.slice(0, 8)}</p>
+                    <p style="margin: 5px 0;"><strong>Contractor:</strong> ${contractorName}</p>
+                    <p style="margin: 5px 0;"><strong>Customer:</strong> ${customerName}</p>
+                    <p style="margin: 5px 0;"><strong>Address:</strong> ${address?.street_address}, ${address?.city}, ${address?.state}</p>
+                    <p style="margin: 5px 0;"><strong>Amount:</strong> $${Number(booking.total_price).toFixed(2)}</p>
+                    <p style="margin: 5px 0;"><strong>Issues:</strong> ${issueList}</p>
+                    ${notesHtml ? `<ul style="margin-top: 10px;">${notesHtml}</ul>` : ""}
+                  </div>
+                  <p>Please review this job and decide on payment adjustment.</p>
+                </div>
+              `,
+            }),
+          });
+          logStep("Admin issue email sent");
+        }
+      } catch (emailError) {
+        logStep("Admin email failed (non-blocking)", { error: String(emailError) });
+      }
+    } else {
+      // Normal completion flow - notify customer and contractor
+      await Promise.all([
+        supabase.from("notifications").insert({
+          user_id: booking.user_id,
+          title: "Your Lawn Has Been Mowed! 🌿",
+          message: `${contractorName} has completed your job. Please review the before/after photos and approve the payment.`,
+          type: "success",
+          booking_id: bookingId,
+        }),
+        supabase.from("notifications").insert({
+          user_id: userId,
+          title: "Job Marked Complete",
+          message: `Your job at ${address?.street_address || "the property"} is marked complete. Payment will be released after customer approval or automatically in 48 hours.`,
+          type: "info",
+          booking_id: bookingId,
+        }),
+      ]);
+
+      // Send emails (non-blocking)
+      try {
+        const resendApiKey = Deno.env.get("RESEND_API_KEY");
+        if (resendApiKey) {
+          const emailPromises = [];
+
+          if (customerEmail) {
+            emailPromises.push(
+              fetch("https://api.resend.com/emails", {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  Authorization: `Bearer ${resendApiKey}`,
+                },
+                body: JSON.stringify({
+                  from: "Lawn Care <onboarding@resend.dev>",
+                  to: [customerEmail],
+                  subject: "Your Lawn Has Been Mowed! 🌿 Review Photos",
+                  html: `
+                    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto;">
+                      <h1 style="color: #16a34a;">Your Lawn Has Been Mowed! 🌿</h1>
+                      <p>Hi ${customerName},</p>
+                      <p>${contractorName} has completed your lawn mowing job. Before and after photos have been uploaded for your review.</p>
+                      <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
+                        <p style="margin: 5px 0;"><strong>Address:</strong> ${address?.street_address}, ${address?.city}, ${address?.state}</p>
+                        <p style="margin: 5px 0;"><strong>Date:</strong> ${dateFormatted}</p>
+                        <p style="margin: 5px 0;"><strong>Amount:</strong> $${Number(booking.total_price).toFixed(2)}</p>
+                      </div>
+                      <p>Please review the photos and approve the payment. If you don't respond, payment will be automatically released in 48 hours.</p>
+                      <p style="color: #666; margin-top: 30px;">Best regards,<br>The Lawnly Team</p>
+                    </div>
+                  `,
+                }),
+              })
+            );
+          }
+
+          if (contractorEmail) {
+            emailPromises.push(
+              fetch("https://api.resend.com/emails", {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  Authorization: `Bearer ${resendApiKey}`,
+                },
+                body: JSON.stringify({
+                  from: "Lawn Care <onboarding@resend.dev>",
+                  to: [contractorEmail],
+                  subject: "Job Marked Complete ✓",
+                  html: `
+                    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto;">
+                      <h1 style="color: #16a34a;">Job Marked Complete ✓</h1>
+                      <p>Hi ${contractorName},</p>
+                      <p>Your job has been marked as complete. The customer has been notified to review your work.</p>
+                      <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
+                        <p style="margin: 5px 0;"><strong>Address:</strong> ${address?.street_address}, ${address?.city}, ${address?.state}</p>
+                        <p style="margin: 5px 0;"><strong>Date:</strong> ${dateFormatted}</p>
+                        <p style="margin: 5px 0;"><strong>Amount:</strong> $${Number(booking.total_price).toFixed(2)}</p>
+                      </div>
+                      <p>Payment will be released after customer approval or automatically in 48 hours.</p>
+                      <p style="color: #666; margin-top: 30px;">Best regards,<br>The Lawnly Team</p>
+                    </div>
+                  `,
+                }),
+              })
+            );
+          }
+
+          await Promise.all(emailPromises);
+          logStep("Emails sent");
+        }
+      } catch (emailError) {
+        logStep("Email sending failed (non-blocking)", { error: String(emailError) });
+      }
     }
 
     return new Response(

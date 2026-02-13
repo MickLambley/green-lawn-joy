@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import {
@@ -19,6 +20,7 @@ import {
   ImageIcon,
   CheckCircle2,
   AlertCircle,
+  AlertTriangle,
 } from "lucide-react";
 import { toast } from "sonner";
 import { photoLogger } from "@/lib/photoDebugLogger";
@@ -33,6 +35,17 @@ interface PhotoItem {
   uploading?: boolean;
   uploaded?: boolean;
 }
+
+const ISSUE_CATEGORIES: { key: string; label: string; requiresPhoto: boolean; requiresText?: boolean }[] = [
+  { key: "partial_access", label: "Partial Access (e.g., locked gate)", requiresPhoto: true },
+  { key: "dog_in_yard", label: "Dog in Yard", requiresPhoto: true },
+  { key: "weather_interruption", label: "Weather Interruption", requiresPhoto: false },
+  { key: "equipment_failure", label: "Equipment Failure", requiresPhoto: false },
+  { key: "unexpected_condition", label: "Unexpected Property Condition (e.g., excessive debris)", requiresPhoto: true },
+  { key: "incorrect_property_info", label: "Incorrect Property Information (size, slope, etc.)", requiresPhoto: true },
+  { key: "pricing_error", label: "Error in Pricing", requiresPhoto: false, requiresText: true },
+  { key: "other", label: "Other", requiresPhoto: false, requiresText: true },
+];
 
 const ContractorJobComplete = () => {
   const { id: bookingId } = useParams<{ id: string }>();
@@ -51,9 +64,15 @@ const ContractorJobComplete = () => {
   const [checkQuality, setCheckQuality] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
+  // Issue reporting state
+  const [selectedIssues, setSelectedIssues] = useState<string[]>([]);
+  const [issueNotes, setIssueNotes] = useState<Record<string, string>>({});
+  const [issuePhotos, setIssuePhotos] = useState<PhotoItem[]>([]);
+  const issuePhotoInputRef = useRef<HTMLInputElement>(null);
+
   const [uploadProgress, setUploadProgress] = useState<{
     active: boolean;
-    type: "before" | "after";
+    type: "before" | "after" | "issue";
     current: number;
     total: number;
   } | null>(null);
@@ -330,7 +349,7 @@ const ContractorJobComplete = () => {
    */
   const handleFileSelect = (
     files: FileList | null,
-    type: "before" | "after"
+    type: "before" | "after" | "issue"
   ) => {
     photoLogger.info("onChange FIRED", { type, hasFiles: !!files, fileCount: files?.length ?? 0 });
 
@@ -339,7 +358,6 @@ const ContractorJobComplete = () => {
       return;
     }
 
-    // Copy file references immediately (FileList can become invalid)
     const fileArray: File[] = [];
     for (let i = 0; i < files.length; i++) {
       fileArray.push(files[i]);
@@ -354,20 +372,18 @@ const ContractorJobComplete = () => {
       })),
     });
 
-    // Clear file inputs IMMEDIATELY to release camera file handles
-    [beforeCameraRef, beforeGalleryRef, afterCameraRef, afterGalleryRef].forEach(ref => {
+    [beforeCameraRef, beforeGalleryRef, afterCameraRef, afterGalleryRef, issuePhotoInputRef].forEach(ref => {
       if (ref.current) ref.current.value = "";
     });
     photoLogger.info("File inputs cleared");
 
-    // Defer processing to next tick — gives browser time to free camera resources
     setTimeout(() => {
       processFiles(fileArray, type);
     }, 100);
   };
 
-  const processFiles = async (fileArray: File[], type: "before" | "after") => {
-    const setPhotos = type === "before" ? setBeforePhotos : setAfterPhotos;
+  const processFiles = async (fileArray: File[], type: "before" | "after" | "issue") => {
+    const setPhotos = type === "before" ? setBeforePhotos : type === "after" ? setAfterPhotos : setIssuePhotos;
     const total = fileArray.length;
 
     photoLogger.info("processFiles START (deferred)", {
@@ -474,9 +490,9 @@ const ContractorJobComplete = () => {
 
   const handleRemovePhoto = async (
     photo: PhotoItem,
-    type: "before" | "after"
+    type: "before" | "after" | "issue"
   ) => {
-    const setPhotos = type === "before" ? setBeforePhotos : setAfterPhotos;
+    const setPhotos = type === "before" ? setBeforePhotos : type === "after" ? setAfterPhotos : setIssuePhotos;
 
     if (photo.photoUrl) {
       await supabase.storage.from("job-photos").remove([photo.photoUrl]);
@@ -491,10 +507,44 @@ const ContractorJobComplete = () => {
   const handleMarkComplete = async () => {
     if (!bookingId || !contractor) return;
 
+    // Validate issue-specific requirements
+    const hasIssues = selectedIssues.length > 0;
+    if (hasIssues) {
+      // Check mandatory text fields
+      for (const issueKey of selectedIssues) {
+        const cat = ISSUE_CATEGORIES.find(c => c.key === issueKey);
+        if (cat?.requiresText && (!issueNotes[issueKey] || issueNotes[issueKey].trim().length < 10)) {
+          toast.error(`Please provide details for "${cat.label}" (minimum 10 characters)`);
+          return;
+        }
+      }
+      // Check mandatory photo requirements
+      const needsPhotos = selectedIssues.some(k => ISSUE_CATEGORIES.find(c => c.key === k)?.requiresPhoto);
+      const issuePhotoCount = issuePhotos.filter(p => p.uploaded).length;
+      if (needsPhotos && issuePhotoCount === 0) {
+        toast.error("Please upload at least one photo as evidence for the reported issue(s)");
+        return;
+      }
+    }
+
     setSubmitting(true);
     try {
+      // Collect issue photo URLs
+      const issuePhotoUrls = issuePhotos
+        .filter(p => p.uploaded && p.photoUrl)
+        .map(p => p.photoUrl!);
+
       const { data, error } = await supabase.functions.invoke("complete-job", {
-        body: { bookingId },
+        body: {
+          bookingId,
+          ...(hasIssues && {
+            issues: selectedIssues,
+            issueNotes: Object.fromEntries(
+              Object.entries(issueNotes).filter(([k]) => selectedIssues.includes(k))
+            ),
+            issuePhotoUrls,
+          }),
+        },
       });
 
       if (error || data?.error) {
@@ -502,7 +552,11 @@ const ContractorJobComplete = () => {
         return;
       }
 
-      toast.success("Job marked as complete! The customer will be notified.");
+      if (hasIssues) {
+        toast.success("Job completed with reported issues. Admin has been notified.");
+      } else {
+        toast.success("Job marked as complete! The customer will be notified.");
+      }
       navigate("/contractor");
     } catch (err) {
       toast.error("An unexpected error occurred");
@@ -513,8 +567,18 @@ const ContractorJobComplete = () => {
 
   const beforeCount = beforePhotos.filter((p) => p.uploaded).length;
   const afterCount = afterPhotos.filter((p) => p.uploaded).length;
+  const issuePhotoCount = issuePhotos.filter((p) => p.uploaded).length;
   const photosReady = beforeCount >= minPhotos && afterCount >= minPhotos;
-  const canSubmit = photosReady && checkPhotosCorrect && checkQuality && !submitting;
+  const hasIssues = selectedIssues.length > 0;
+  
+  // Validate issue requirements for canSubmit
+  const issueRequiresPhoto = selectedIssues.some(k => ISSUE_CATEGORIES.find(c => c.key === k)?.requiresPhoto);
+  const issuePhotosValid = !issueRequiresPhoto || issuePhotoCount > 0;
+  const issueTextValid = selectedIssues.every(k => {
+    const cat = ISSUE_CATEGORIES.find(c => c.key === k);
+    return !cat?.requiresText || (issueNotes[k] && issueNotes[k].trim().length >= 10);
+  });
+  const canSubmit = photosReady && checkPhotosCorrect && checkQuality && !submitting && issuePhotosValid && issueTextValid;
 
   const timeSlots: Record<string, string> = {
     "7am-10am": "7:00 AM - 10:00 AM",
@@ -825,7 +889,135 @@ const ContractorJobComplete = () => {
           </CardContent>
         </Card>
 
-        {/* Quality Checklist */}
+        {/* Job Issues / Notes (optional) */}
+        <Card className={hasIssues ? "border-yellow-500/50" : ""}>
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <AlertTriangle className="w-5 h-5" />
+              Job Issues / Notes
+              <Badge variant="outline" className="ml-auto text-xs">Optional</Badge>
+            </CardTitle>
+            <p className="text-sm text-muted-foreground">
+              Report any issues that prevented full completion or impacted quality. This will trigger admin review.
+            </p>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {ISSUE_CATEGORIES.map((cat) => (
+              <div key={cat.key} className="space-y-2">
+                <div className="flex items-start gap-3">
+                  <Checkbox
+                    id={`issue-${cat.key}`}
+                    checked={selectedIssues.includes(cat.key)}
+                    onCheckedChange={(checked) => {
+                      if (checked) {
+                        setSelectedIssues(prev => [...prev, cat.key]);
+                      } else {
+                        setSelectedIssues(prev => prev.filter(k => k !== cat.key));
+                        setIssueNotes(prev => {
+                          const copy = { ...prev };
+                          delete copy[cat.key];
+                          return copy;
+                        });
+                      }
+                    }}
+                  />
+                  <label htmlFor={`issue-${cat.key}`} className="text-sm leading-relaxed cursor-pointer">
+                    {cat.label}
+                    {cat.requiresPhoto && (
+                      <span className="text-xs text-muted-foreground ml-1">(photo evidence required)</span>
+                    )}
+                    {cat.requiresText && (
+                      <span className="text-xs text-muted-foreground ml-1">(details required)</span>
+                    )}
+                  </label>
+                </div>
+                {selectedIssues.includes(cat.key) && cat.requiresText && (
+                  <div className="ml-8">
+                    <Textarea
+                      placeholder={`Describe the ${cat.label.toLowerCase()} issue (min 10 characters)...`}
+                      value={issueNotes[cat.key] || ""}
+                      onChange={(e) => setIssueNotes(prev => ({ ...prev, [cat.key]: e.target.value }))}
+                      rows={2}
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {(issueNotes[cat.key] || "").length}/10 characters minimum
+                    </p>
+                  </div>
+                )}
+              </div>
+            ))}
+
+            {/* Issue photos section - shown when any issue is selected */}
+            {hasIssues && (
+              <div className="pt-4 border-t space-y-3">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-medium">
+                    Evidence Photos {issueRequiresPhoto ? "*" : "(optional)"}
+                  </p>
+                  <Badge variant={issueRequiresPhoto && issuePhotoCount === 0 ? "destructive" : "secondary"}>
+                    {issuePhotoCount} uploaded
+                  </Badge>
+                </div>
+
+                <div className="grid grid-cols-3 gap-2">
+                  {issuePhotos.map((photo, idx) => (
+                    <div key={idx} className="relative aspect-square rounded-lg border bg-muted/30 overflow-hidden">
+                      {photo.uploading ? (
+                        <div className="absolute inset-0 flex items-center justify-center">
+                          <Loader2 className="w-6 h-6 animate-spin text-primary" />
+                        </div>
+                      ) : photo.thumbnailUrl ? (
+                        <img src={photo.thumbnailUrl} alt={photo.fileName} className="w-full h-full object-cover" loading="lazy" />
+                      ) : (
+                        <div className="absolute inset-0 flex items-center justify-center">
+                          <ImageIcon className="w-6 h-6 text-muted-foreground" />
+                        </div>
+                      )}
+                      {photo.uploaded && (
+                        <CheckCircle2 className="absolute top-1 left-1 w-4 h-4 text-primary drop-shadow" />
+                      )}
+                      <button
+                        onClick={() => handleRemovePhoto(photo, "issue")}
+                        className="absolute top-1 right-1 p-0.5 rounded-full bg-background/80 hover:bg-destructive hover:text-destructive-foreground transition-colors"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => issuePhotoInputRef.current?.click()}
+                >
+                  <Camera className="w-4 h-4 mr-2" />
+                  Add Issue Photos
+                </Button>
+
+                {uploadProgress?.active && uploadProgress.type === "issue" && (
+                  <div className="space-y-2 p-3 rounded-lg bg-muted/50 border">
+                    <div className="flex items-center gap-2 text-sm font-medium">
+                      <Loader2 className="w-4 h-4 animate-spin text-primary" />
+                      <span>Uploading photo {uploadProgress.current} of {uploadProgress.total}...</span>
+                    </div>
+                    <Progress value={(uploadProgress.current / uploadProgress.total) * 100} className="h-2" />
+                  </div>
+                )}
+
+                <input
+                  ref={issuePhotoInputRef}
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  className="hidden"
+                  onChange={(e) => handleFileSelect(e.target.files, "issue")}
+                />
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
         <Card>
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
@@ -879,7 +1071,7 @@ const ContractorJobComplete = () => {
           ) : (
             <Check className="w-5 h-5 mr-2" />
           )}
-          {submitting ? "Completing Job..." : "Mark Job Complete"}
+          {submitting ? "Completing Job..." : hasIssues ? "Complete Job & Report Issues" : "Mark Job Complete"}
         </Button>
       </main>
     </div>
