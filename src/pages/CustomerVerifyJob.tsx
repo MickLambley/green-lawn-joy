@@ -200,13 +200,113 @@ const CustomerVerifyJob = () => {
     }
   };
 
+  /**
+   * Ultra-low-memory image compression (same strategy as contractor uploads).
+   * Strategy 1: createImageBitmap with resizeWidth — browser decodes at reduced resolution.
+   * Strategy 2 (fallback): <img> element + canvas.
+   */
+  const compressImage = (file: File, maxWidth = 600, quality = 0.5): Promise<Blob> => {
+    return compressWithBitmapResize(file, maxWidth, quality)
+      .catch(() => compressWithImgElement(file, maxWidth, quality));
+  };
+
+  const compressWithBitmapResize = async (file: File, maxWidth: number, quality: number): Promise<Blob> => {
+    const probeBitmap = await createImageBitmap(file);
+    const natW = probeBitmap.width;
+    const natH = probeBitmap.height;
+    probeBitmap.close();
+
+    const scale = Math.min(1, maxWidth / natW);
+    const targetW = Math.round(natW * scale);
+    const targetH = Math.round(natH * scale);
+
+    const bitmap = await createImageBitmap(file, {
+      resizeWidth: targetW,
+      resizeHeight: targetH,
+      resizeQuality: "low",
+    });
+
+    const canvas = document.createElement("canvas");
+    canvas.width = targetW;
+    canvas.height = targetH;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) { bitmap.close(); throw new Error("Canvas not supported"); }
+
+    ctx.drawImage(bitmap, 0, 0);
+    bitmap.close();
+
+    return new Promise<Blob>((resolve, reject) => {
+      canvas.toBlob(
+        (blob) => {
+          canvas.width = 0;
+          canvas.height = 0;
+          blob ? resolve(blob) : reject(new Error("Compression failed"));
+        },
+        "image/jpeg",
+        quality
+      );
+    });
+  };
+
+  const compressWithImgElement = (file: File, maxWidth: number, quality: number): Promise<Blob> => {
+    return new Promise((resolve, reject) => {
+      const objectUrl = URL.createObjectURL(file);
+      const img = new Image();
+      img.onload = () => {
+        try {
+          const scale = Math.min(1, maxWidth / img.naturalWidth);
+          const w = Math.round(img.naturalWidth * scale);
+          const h = Math.round(img.naturalHeight * scale);
+          const canvas = document.createElement("canvas");
+          canvas.width = w;
+          canvas.height = h;
+          const ctx = canvas.getContext("2d");
+          if (!ctx) { URL.revokeObjectURL(objectUrl); reject(new Error("Canvas not supported")); return; }
+          ctx.drawImage(img, 0, 0, w, h);
+          canvas.toBlob(
+            (blob) => {
+              URL.revokeObjectURL(objectUrl);
+              canvas.width = 0;
+              canvas.height = 0;
+              blob ? resolve(blob) : reject(new Error("Compression failed"));
+            },
+            "image/jpeg",
+            quality
+          );
+        } catch (err) {
+          URL.revokeObjectURL(objectUrl);
+          reject(err);
+        }
+      };
+      img.onerror = () => { URL.revokeObjectURL(objectUrl); reject(new Error("Image load failed")); };
+      img.src = objectUrl;
+    });
+  };
+
   const handleDisputePhotoSelect = (files: FileList | null) => {
-    if (!files) return;
-    const items = Array.from(files).map(file => ({
-      file,
-      previewUrl: URL.createObjectURL(file),
-    }));
-    setDisputePhotos(prev => [...prev, ...items]);
+    if (!files || files.length === 0) return;
+
+    // Copy file references immediately
+    const fileArray: File[] = Array.from(files);
+
+    // Clear input to release file handles
+    if (disputeInputRef.current) disputeInputRef.current.value = "";
+
+    // Process sequentially with compression (deferred)
+    setTimeout(async () => {
+      for (let i = 0; i < fileArray.length; i++) {
+        const file = fileArray[i];
+        if (i > 0) await new Promise(r => setTimeout(r, 300));
+
+        try {
+          const compressed = await compressImage(file);
+          const previewUrl = URL.createObjectURL(compressed);
+          setDisputePhotos(prev => [...prev, { file: new File([compressed], file.name, { type: "image/jpeg" }), previewUrl }]);
+        } catch {
+          toast.error(`Failed to process photo ${i + 1}. Skipping.`);
+        }
+      }
+    }, 100);
   };
 
   const removeDisputePhoto = (idx: number) => {
