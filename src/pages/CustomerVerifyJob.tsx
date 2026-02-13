@@ -158,9 +158,19 @@ const CustomerVerifyJob = () => {
 
     setSubmittingRating(true);
     try {
-      // Rating was already submitted with approval if approve-job was called with rating
-      // But if user rates after, we insert directly
       const { data: { user } } = await supabase.auth.getUser();
+      
+      // Save rating to bookings table
+      await supabase
+        .from("bookings")
+        .update({
+          customer_rating: rating,
+          rating_comment: ratingComment?.slice(0, 200) || null,
+          rating_submitted_at: new Date().toISOString(),
+        })
+        .eq("id", bookingId!);
+
+      // Also save to reviews table for backwards compatibility
       if (user && booking.contractor_id) {
         await supabase.from("reviews").insert({
           user_id: user.id,
@@ -175,7 +185,7 @@ const CustomerVerifyJob = () => {
     } finally {
       setSubmittingRating(false);
       setRatingDialogOpen(false);
-      toast.success(`Thank you! Payment has been released to ${contractorName}.`);
+      toast.success("Thank you for your feedback!");
     }
   };
 
@@ -466,12 +476,16 @@ const CustomerVerifyJob = () => {
               ))}
             </div>
             {rating > 0 && (
-              <Textarea
-                placeholder="Any comments? (optional)"
-                value={ratingComment}
-                onChange={(e) => setRatingComment(e.target.value)}
-                rows={3}
-              />
+              <>
+                <Textarea
+                  placeholder="How was your experience? (max 200 chars)"
+                  value={ratingComment}
+                  onChange={(e) => setRatingComment(e.target.value.slice(0, 200))}
+                  rows={3}
+                  maxLength={200}
+                />
+                <p className="text-xs text-muted-foreground text-right">{ratingComment.length}/200</p>
+              </>
             )}
           </div>
           <DialogFooter>

@@ -141,7 +141,9 @@ export type Database = {
           completed_at: string | null
           contractor_accepted_at: string | null
           contractor_id: string | null
+          contractor_rating_response: string | null
           created_at: string
+          customer_rating: number | null
           grass_length: string
           id: string
           is_public_holiday: boolean
@@ -154,6 +156,8 @@ export type Database = {
           payout_status: string
           preferred_contractor_id: string | null
           quote_breakdown: Json | null
+          rating_comment: string | null
+          rating_submitted_at: string | null
           scheduled_date: string
           scheduled_time: string | null
           status: Database["public"]["Enums"]["booking_status"]
@@ -175,7 +179,9 @@ export type Database = {
           completed_at?: string | null
           contractor_accepted_at?: string | null
           contractor_id?: string | null
+          contractor_rating_response?: string | null
           created_at?: string
+          customer_rating?: number | null
           grass_length?: string
           id?: string
           is_public_holiday?: boolean
@@ -188,6 +194,8 @@ export type Database = {
           payout_status?: string
           preferred_contractor_id?: string | null
           quote_breakdown?: Json | null
+          rating_comment?: string | null
+          rating_submitted_at?: string | null
           scheduled_date: string
           scheduled_time?: string | null
           status?: Database["public"]["Enums"]["booking_status"]
@@ -209,7 +217,9 @@ export type Database = {
           completed_at?: string | null
           contractor_accepted_at?: string | null
           contractor_id?: string | null
+          contractor_rating_response?: string | null
           created_at?: string
+          customer_rating?: number | null
           grass_length?: string
           id?: string
           is_public_holiday?: boolean
@@ -222,6 +232,8 @@ export type Database = {
           payout_status?: string
           preferred_contractor_id?: string | null
           quote_breakdown?: Json | null
+          rating_comment?: string | null
+          rating_submitted_at?: string | null
           scheduled_date?: string
           scheduled_time?: string | null
           status?: Database["public"]["Enums"]["booking_status"]
@@ -255,6 +267,7 @@ export type Database = {
           approval_status: string
           approved_at: string | null
           approved_by: string | null
+          average_rating: number | null
           business_address: string | null
           business_name: string | null
           created_at: string
@@ -271,6 +284,7 @@ export type Database = {
           stripe_onboarding_complete: boolean
           stripe_payouts_enabled: boolean
           tier: Database["public"]["Enums"]["contractor_tier"]
+          total_ratings_count: number | null
           updated_at: string
           user_id: string
         }
@@ -280,6 +294,7 @@ export type Database = {
           approval_status?: string
           approved_at?: string | null
           approved_by?: string | null
+          average_rating?: number | null
           business_address?: string | null
           business_name?: string | null
           created_at?: string
@@ -296,6 +311,7 @@ export type Database = {
           stripe_onboarding_complete?: boolean
           stripe_payouts_enabled?: boolean
           tier?: Database["public"]["Enums"]["contractor_tier"]
+          total_ratings_count?: number | null
           updated_at?: string
           user_id: string
         }
@@ -305,6 +321,7 @@ export type Database = {
           approval_status?: string
           approved_at?: string | null
           approved_by?: string | null
+          average_rating?: number | null
           business_address?: string | null
           business_name?: string | null
           created_at?: string
@@ -321,6 +338,7 @@ export type Database = {
           stripe_onboarding_complete?: boolean
           stripe_payouts_enabled?: boolean
           tier?: Database["public"]["Enums"]["contractor_tier"]
+          total_ratings_count?: number | null
           updated_at?: string
           user_id?: string
         }

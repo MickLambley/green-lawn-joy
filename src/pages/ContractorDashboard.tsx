@@ -47,13 +47,14 @@ import { toast } from "sonner";
 import type { Database } from "@/integrations/supabase/types";
 import JobDetailsDialog from "@/components/contractor/JobDetailsDialog";
 import ContractorTierBadge from "@/components/contractor/ContractorTierBadge";
+import ContractorRatingsSection from "@/components/contractor/ContractorRatingsSection";
 
 type Booking = Database["public"]["Tables"]["bookings"]["Row"];
 type Address = Database["public"]["Tables"]["addresses"]["Row"];
 type Contractor = Database["public"]["Tables"]["contractors"]["Row"];
 type Profile = Database["public"]["Tables"]["profiles"]["Row"];
 
-interface BookingWithAddress extends Omit<Booking, 'admin_notes' | 'payment_intent_id' | 'payment_status' | 'payment_method_id' | 'charged_at' | 'payout_status' | 'payout_released_at' | 'completed_at' | 'stripe_payout_id'> {
+interface BookingWithAddress extends Omit<Booking, 'admin_notes' | 'payment_intent_id' | 'payment_status' | 'payment_method_id' | 'charged_at' | 'payout_status' | 'payout_released_at' | 'completed_at' | 'stripe_payout_id' | 'customer_rating' | 'rating_comment' | 'rating_submitted_at' | 'contractor_rating_response'> {
   admin_notes?: string | null;
   payment_intent_id?: string | null;
   payment_status?: string;
@@ -63,6 +64,10 @@ interface BookingWithAddress extends Omit<Booking, 'admin_notes' | 'payment_inte
   payout_released_at?: string | null;
   completed_at?: string | null;
   stripe_payout_id?: string | null;
+  customer_rating?: number | null;
+  rating_comment?: string | null;
+  rating_submitted_at?: string | null;
+  contractor_rating_response?: string | null;
   address?: Address;
   customerProfile?: Profile;
 }
@@ -844,6 +849,13 @@ const ContractorDashboard = () => {
             )}
           </CardContent>
         </Card>
+
+        {/* Ratings Section */}
+        {contractor && (
+          <div className="mt-8">
+            <ContractorRatingsSection contractor={contractor} />
+          </div>
+        )}
           </>
         )}
       </main>
