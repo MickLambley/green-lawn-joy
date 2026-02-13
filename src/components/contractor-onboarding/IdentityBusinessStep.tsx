@@ -162,7 +162,9 @@ export const IdentityBusinessStep = ({ data, onChange, userId, onNext }: Identit
     (data.mailingAddressSameAsBusiness || data.mailingAddress.trim().length > 0) &&
     data.confirmIndependentBusiness &&
     data.insuranceCertificatePath !== null &&
-    data.confirmInsuranceCoverage;
+    data.confirmInsuranceCoverage &&
+    data.insuranceExpiryDate.length > 0 &&
+    new Date(data.insuranceExpiryDate) > new Date();
 
   return (
     <Card>
@@ -367,21 +369,38 @@ export const IdentityBusinessStep = ({ data, onChange, userId, onNext }: Identit
 
         {/* Insurance Coverage Confirmation */}
         {data.insuranceCertificatePath && (
-          <div className="flex items-start space-x-3 p-4 bg-muted/50 rounded-lg">
-            <Checkbox
-              id="confirmInsurance"
-              checked={data.confirmInsuranceCoverage}
-              onCheckedChange={(checked) => 
-                onChange({ ...data, confirmInsuranceCoverage: checked === true })
-              }
-            />
-            <label
-              htmlFor="confirmInsurance"
-              className="text-sm leading-relaxed cursor-pointer"
-            >
-              I confirm this insurance policy covers lawn care / gardening services.
-            </label>
-          </div>
+          <>
+            {/* Insurance Expiry Date */}
+            <div className="space-y-2">
+              <Label htmlFor="insuranceExpiry">Insurance Expiry Date *</Label>
+              <Input
+                id="insuranceExpiry"
+                type="date"
+                value={data.insuranceExpiryDate}
+                onChange={(e) => onChange({ ...data, insuranceExpiryDate: e.target.value })}
+                min={new Date().toISOString().split("T")[0]}
+              />
+              {data.insuranceExpiryDate && new Date(data.insuranceExpiryDate) <= new Date() && (
+                <p className="text-xs text-destructive">Expiry date must be in the future</p>
+              )}
+            </div>
+
+            <div className="flex items-start space-x-3 p-4 bg-muted/50 rounded-lg">
+              <Checkbox
+                id="confirmInsurance"
+                checked={data.confirmInsuranceCoverage}
+                onCheckedChange={(checked) => 
+                  onChange({ ...data, confirmInsuranceCoverage: checked === true })
+                }
+              />
+              <label
+                htmlFor="confirmInsurance"
+                className="text-sm leading-relaxed cursor-pointer"
+              >
+                I confirm this insurance policy covers lawn care / gardening services.
+              </label>
+            </div>
+          </>
         )}
 
         {/* Next Button */}

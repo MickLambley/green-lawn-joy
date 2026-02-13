@@ -277,6 +277,9 @@ export type Database = {
           disputed_jobs_count: number
           id: string
           insurance_certificate_url: string | null
+          insurance_expiry_date: string | null
+          insurance_uploaded_at: string | null
+          insurance_verified: boolean
           is_active: boolean
           last_active_at: string | null
           phone: string | null
@@ -315,6 +318,9 @@ export type Database = {
           disputed_jobs_count?: number
           id?: string
           insurance_certificate_url?: string | null
+          insurance_expiry_date?: string | null
+          insurance_uploaded_at?: string | null
+          insurance_verified?: boolean
           is_active?: boolean
           last_active_at?: string | null
           phone?: string | null
@@ -353,6 +359,9 @@ export type Database = {
           disputed_jobs_count?: number
           id?: string
           insurance_certificate_url?: string | null
+          insurance_expiry_date?: string | null
+          insurance_uploaded_at?: string | null
+          insurance_verified?: boolean
           is_active?: boolean
           last_active_at?: string | null
           phone?: string | null

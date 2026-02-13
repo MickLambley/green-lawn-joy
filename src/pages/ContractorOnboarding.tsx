@@ -26,6 +26,7 @@ export interface IdentityBusinessData {
   confirmIndependentBusiness: boolean;
   insuranceCertificatePath: string | null;
   confirmInsuranceCoverage: boolean;
+  insuranceExpiryDate: string;
 }
 
 export interface ServicesEquipmentData {
@@ -75,6 +76,7 @@ const ContractorOnboarding = () => {
     confirmIndependentBusiness: false,
     insuranceCertificatePath: null,
     confirmInsuranceCoverage: false,
+    insuranceExpiryDate: "",
   });
 
   const [servicesData, setServicesData] = useState<ServicesEquipmentData>({
@@ -225,6 +227,8 @@ const ContractorOnboarding = () => {
           abn: identityData.abn.replace(/\s/g, ""),
           phone: identityData.mobileNumber,
           insurance_certificate_url: identityData.insuranceCertificatePath,
+          insurance_expiry_date: identityData.insuranceExpiryDate || null,
+          insurance_uploaded_at: identityData.insuranceCertificatePath ? new Date().toISOString() : null,
           questionnaire_responses: JSON.parse(JSON.stringify(questionnaireResponses)),
           service_radius_km: geographicData.maxTravelDistanceKm,
           service_center_lat: geographicData.baseAddressLat,
