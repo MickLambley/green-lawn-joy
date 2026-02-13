@@ -34,9 +34,10 @@ serve(async (req) => {
     const userId = userData.user.id;
     logStep("User authenticated", { userId });
 
-    const { bookingId, description, photoUrls } = await req.json();
+    const { bookingId, description, photoUrls, disputeReason, suggestedRefundAmount } = await req.json();
     if (!bookingId) throw new Error("Missing bookingId");
     if (!description || description.length < 20) throw new Error("Description must be at least 20 characters");
+    if (!disputeReason) throw new Error("Missing dispute reason");
 
     // Fetch booking
     const { data: booking, error: bookingError } = await supabase
@@ -64,6 +65,14 @@ serve(async (req) => {
 
     logStep("Booking verified", { bookingId, isPostPayment });
 
+    // Validate suggested refund amount
+    if (suggestedRefundAmount !== undefined && suggestedRefundAmount !== null) {
+      const amount = Number(suggestedRefundAmount);
+      if (isNaN(amount) || amount < 0 || amount > Number(booking.total_price)) {
+        throw new Error("Suggested refund amount is invalid");
+      }
+    }
+
     // Create dispute
     const { error: disputeError } = await supabase
       .from("disputes")
@@ -72,6 +81,8 @@ serve(async (req) => {
         raised_by: "customer",
         description,
         customer_photos: photoUrls || [],
+        dispute_reason: disputeReason,
+        suggested_refund_amount: suggestedRefundAmount || null,
       });
 
     if (disputeError) throw new Error(`Failed to create dispute: ${disputeError.message}`);

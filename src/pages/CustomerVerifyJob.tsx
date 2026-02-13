@@ -24,6 +24,15 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
   Leaf,
   Loader2,
   ArrowLeft,
@@ -59,7 +68,9 @@ const CustomerVerifyJob = () => {
 
   // Dispute flow
   const [disputeDialogOpen, setDisputeDialogOpen] = useState(false);
+  const [disputeReason, setDisputeReason] = useState("");
   const [disputeDescription, setDisputeDescription] = useState("");
+  const [suggestedRefundAmount, setSuggestedRefundAmount] = useState("");
   const [disputePhotos, setDisputePhotos] = useState<{ file: File; previewUrl: string }[]>([]);
   const [submittingDispute, setSubmittingDispute] = useState(false);
   const [disputed, setDisputed] = useState(false);
@@ -206,8 +217,19 @@ const CustomerVerifyJob = () => {
   };
 
   const handleSubmitDispute = async () => {
+    if (!disputeReason) {
+      toast.error("Please select a dispute reason");
+      return;
+    }
     if (disputeDescription.length < 20) {
       toast.error("Please provide a more detailed description (minimum 20 characters)");
+      return;
+    }
+
+    const maxRefund = Number(booking?.total_price) || 0;
+    const refundNum = suggestedRefundAmount ? parseFloat(suggestedRefundAmount) : 0;
+    if (refundNum < 0 || refundNum > maxRefund) {
+      toast.error(`Suggested refund must be between $0 and $${maxRefund.toFixed(2)}`);
       return;
     }
 
@@ -225,7 +247,13 @@ const CustomerVerifyJob = () => {
       }
 
       const { data, error } = await supabase.functions.invoke("dispute-job", {
-        body: { bookingId, description: disputeDescription, photoUrls },
+        body: {
+          bookingId,
+          description: disputeDescription,
+          photoUrls,
+          disputeReason,
+          suggestedRefundAmount: refundNum > 0 ? refundNum : undefined,
+        },
       });
 
       if (error || data?.error) throw new Error(data?.error || "Failed to submit dispute");
@@ -500,7 +528,6 @@ const CustomerVerifyJob = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Dispute Dialog */}
       <Dialog open={disputeDialogOpen} onOpenChange={setDisputeDialogOpen}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
@@ -511,7 +538,23 @@ const CustomerVerifyJob = () => {
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div>
-              <label className="text-sm font-medium mb-2 block">What's wrong? *</label>
+              <Label className="mb-2 block">Dispute Reason *</Label>
+              <Select value={disputeReason} onValueChange={setDisputeReason}>
+                <SelectTrigger className="bg-background">
+                  <SelectValue placeholder="Select a reason..." />
+                </SelectTrigger>
+                <SelectContent className="bg-popover z-50">
+                  <SelectItem value="poor_quality">Poor Quality</SelectItem>
+                  <SelectItem value="partial_completion">Partial Completion</SelectItem>
+                  <SelectItem value="property_damage">Property Damage</SelectItem>
+                  <SelectItem value="no_show">No Show</SelectItem>
+                  <SelectItem value="other">Other</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label className="mb-2 block">Details *</Label>
               <Textarea
                 placeholder="Please describe the issue in detail (minimum 20 characters)..."
                 value={disputeDescription}
@@ -524,7 +567,27 @@ const CustomerVerifyJob = () => {
             </div>
 
             <div>
-              <label className="text-sm font-medium mb-2 block">Upload photos (optional)</label>
+              <Label className="mb-2 block">Suggested Refund Amount (optional)</Label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">$</span>
+                <Input
+                  type="number"
+                  min={0}
+                  max={Number(booking?.total_price) || 0}
+                  step={0.01}
+                  placeholder="0.00"
+                  value={suggestedRefundAmount}
+                  onChange={(e) => setSuggestedRefundAmount(e.target.value)}
+                  className="pl-7"
+                />
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                Max: ${Number(booking?.total_price || 0).toFixed(2)}
+              </p>
+            </div>
+
+            <div>
+              <Label className="mb-2 block">Upload photos (optional)</Label>
               <div className="grid grid-cols-4 gap-2">
                 {disputePhotos.map((photo, idx) => (
                   <div key={idx} className="relative aspect-square rounded-lg overflow-hidden border">
@@ -561,7 +624,7 @@ const CustomerVerifyJob = () => {
             </Button>
             <Button
               onClick={handleSubmitDispute}
-              disabled={submittingDispute || disputeDescription.length < 20}
+              disabled={submittingDispute || !disputeReason || disputeDescription.length < 20}
               variant="destructive"
             >
               {submittingDispute ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
