@@ -527,6 +527,44 @@ const ContractorDashboard = () => {
           </Card>
         )}
 
+        {/* Quality Status Banners */}
+        {contractor?.approval_status === "approved" && (contractor as any).suspension_status === "warning" && (
+          <Card className="mb-6 border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-900/20">
+            <CardContent className="pt-5 pb-4">
+              <div className="flex items-center gap-3">
+                <AlertCircle className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0" />
+                <p className="text-sm text-amber-800 dark:text-amber-200">
+                  <strong>⚠️ Quality Alert:</strong> Your performance metrics need improvement. Maintain high ratings and avoid cancellations to keep your account in good standing.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+        {contractor?.approval_status === "approved" && (contractor as any).suspension_status === "review_required" && (
+          <Card className="mb-6 border-orange-200 bg-orange-50 dark:border-orange-800 dark:bg-orange-900/20">
+            <CardContent className="pt-5 pb-4">
+              <div className="flex items-center gap-3">
+                <AlertCircle className="w-5 h-5 text-orange-600 dark:text-orange-400 shrink-0" />
+                <p className="text-sm text-orange-800 dark:text-orange-200">
+                  <strong>🔍 Account Under Review:</strong> Your account is currently under review due to quality concerns. Our support team will contact you shortly.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+        {contractor?.approval_status === "approved" && (contractor as any).suspension_status === "suspended" && (
+          <Card className="mb-6 border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-900/20">
+            <CardContent className="pt-5 pb-4">
+              <div className="flex items-center gap-3">
+                <AlertCircle className="w-5 h-5 text-destructive shrink-0" />
+                <p className="text-sm text-red-800 dark:text-red-200">
+                  <strong>🚫 Account Suspended:</strong> Your account has been suspended due to quality violations. Please contact support for assistance.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Only show dashboard content if approved */}
         {!isPendingApproval && !isRejected && (
           <>

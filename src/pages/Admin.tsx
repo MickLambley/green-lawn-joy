@@ -30,11 +30,12 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
-import { Leaf, LogOut, MapPin, Calendar, Check, X, Eye, Settings, Users, PenTool, AlertTriangle, Star } from "lucide-react";
+import { Leaf, LogOut, MapPin, Calendar, Check, X, Eye, Settings, Users, PenTool, AlertTriangle, Star, ShieldAlert } from "lucide-react";
 import PricingSettingsTab from "@/components/admin/PricingSettingsTab";
 import ContractorApplicationsTab from "@/components/admin/ContractorApplicationsTab";
 import AdminLawnEditorDialog from "@/components/admin/AdminLawnEditorDialog";
 import AdminDisputesTab from "@/components/admin/AdminDisputesTab";
+import AdminQualityAlertsTab from "@/components/admin/AdminQualityAlertsTab";
 import AdminBookingPhotosSection from "@/components/admin/AdminBookingPhotosSection";
 import type { Database } from "@/integrations/supabase/types";
 
@@ -410,6 +411,10 @@ const Admin = () => {
               <AlertTriangle className="w-4 h-4" />
               Disputes
             </TabsTrigger>
+            <TabsTrigger value="quality" className="flex items-center gap-2">
+              <ShieldAlert className="w-4 h-4" />
+              Quality
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="addresses">
@@ -557,6 +562,10 @@ const Admin = () => {
 
           <TabsContent value="disputes">
             <AdminDisputesTab />
+          </TabsContent>
+
+          <TabsContent value="quality">
+            <AdminQualityAlertsTab />
           </TabsContent>
         </Tabs>
       </main>
