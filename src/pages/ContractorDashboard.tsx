@@ -58,7 +58,7 @@ type Address = Database["public"]["Tables"]["addresses"]["Row"];
 type Contractor = Database["public"]["Tables"]["contractors"]["Row"];
 type Profile = Database["public"]["Tables"]["profiles"]["Row"];
 
-interface BookingWithAddress extends Omit<Booking, 'admin_notes' | 'payment_intent_id' | 'payment_status' | 'payment_method_id' | 'charged_at' | 'payout_status' | 'payout_released_at' | 'completed_at' | 'stripe_payout_id' | 'customer_rating' | 'rating_comment' | 'rating_submitted_at' | 'contractor_rating_response' | 'contractor_issues' | 'contractor_issue_notes' | 'contractor_issue_photos'> {
+interface BookingWithAddress extends Omit<Booking, 'admin_notes' | 'payment_intent_id' | 'payment_status' | 'payment_method_id' | 'charged_at' | 'payout_status' | 'payout_released_at' | 'completed_at' | 'stripe_payout_id' | 'customer_rating' | 'rating_comment' | 'rating_submitted_at' | 'contractor_rating_response' | 'contractor_issues' | 'contractor_issue_notes' | 'contractor_issue_photos' | 'original_price' | 'price_change_notified_at'> {
   admin_notes?: string | null;
   payment_intent_id?: string | null;
   payment_status?: string;
@@ -75,6 +75,8 @@ interface BookingWithAddress extends Omit<Booking, 'admin_notes' | 'payment_inte
   contractor_issues?: any | null;
   contractor_issue_notes?: string | null;
   contractor_issue_photos?: string[] | null;
+  original_price?: number | null;
+  price_change_notified_at?: string | null;
   address?: Address;
   customerProfile?: Profile;
 }

@@ -79,9 +79,10 @@ Deno.serve(async (req) => {
       );
     }
 
-    if (address.status !== "verified") {
+    // Allow quotes for both verified and pending addresses
+    if (address.status === "rejected") {
       return new Response(
-        JSON.stringify({ error: "Address must be verified before booking" }),
+        JSON.stringify({ error: "Address has been rejected" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -92,6 +93,8 @@ Deno.serve(async (req) => {
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
+
+    const isPreliminary = address.status !== "verified";
 
     // Use service role to fetch pricing settings (hidden from clients)
     const serviceClient = createClient(supabaseUrl, supabaseServiceKey);
@@ -157,7 +160,7 @@ Deno.serve(async (req) => {
     };
 
     return new Response(
-      JSON.stringify({ quote }),
+      JSON.stringify({ quote, isPreliminary }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error) {

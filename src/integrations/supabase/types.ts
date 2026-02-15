@@ -152,12 +152,14 @@ export type Database = {
           is_public_holiday: boolean
           is_weekend: boolean
           notes: string | null
+          original_price: number | null
           payment_intent_id: string | null
           payment_method_id: string | null
           payment_status: string
           payout_released_at: string | null
           payout_status: string
           preferred_contractor_id: string | null
+          price_change_notified_at: string | null
           quote_breakdown: Json | null
           rating_comment: string | null
           rating_submitted_at: string | null
@@ -193,12 +195,14 @@ export type Database = {
           is_public_holiday?: boolean
           is_weekend?: boolean
           notes?: string | null
+          original_price?: number | null
           payment_intent_id?: string | null
           payment_method_id?: string | null
           payment_status?: string
           payout_released_at?: string | null
           payout_status?: string
           preferred_contractor_id?: string | null
+          price_change_notified_at?: string | null
           quote_breakdown?: Json | null
           rating_comment?: string | null
           rating_submitted_at?: string | null
@@ -234,12 +238,14 @@ export type Database = {
           is_public_holiday?: boolean
           is_weekend?: boolean
           notes?: string | null
+          original_price?: number | null
           payment_intent_id?: string | null
           payment_method_id?: string | null
           payment_status?: string
           payout_released_at?: string | null
           payout_status?: string
           preferred_contractor_id?: string | null
+          price_change_notified_at?: string | null
           quote_breakdown?: Json | null
           rating_comment?: string | null
           rating_submitted_at?: string | null
@@ -738,6 +744,8 @@ export type Database = {
         | "disputed"
         | "post_payment_dispute"
         | "completed_with_issues"
+        | "pending_address_verification"
+        | "price_change_pending"
       contractor_tier: "probation" | "standard" | "premium"
       slope_type: "flat" | "mild" | "steep"
     }
@@ -878,6 +886,8 @@ export const Constants = {
         "disputed",
         "post_payment_dispute",
         "completed_with_issues",
+        "pending_address_verification",
+        "price_change_pending",
       ],
       contractor_tier: ["probation", "standard", "premium"],
       slope_type: ["flat", "mild", "steep"],

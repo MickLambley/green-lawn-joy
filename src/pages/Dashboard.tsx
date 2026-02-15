@@ -322,6 +322,34 @@ const Dashboard = () => {
     }
   };
 
+  const handlePriceApproval = async (bookingId: string, approved: boolean) => {
+    try {
+      if (approved) {
+        // Approve price change - trigger payment setup
+        const { data, error } = await supabase.functions.invoke("approve-price-change", {
+          body: { bookingId },
+        });
+
+        if (error) throw error;
+        toast.success("Price approved! Your booking is now being processed.");
+      } else {
+        // Cancel booking
+        const { error } = await supabase
+          .from("bookings")
+          .update({ status: "cancelled" as any })
+          .eq("id", bookingId);
+
+        if (error) throw error;
+        toast.success("Booking cancelled.");
+      }
+
+      if (user) fetchUserData(user.id);
+    } catch (error) {
+      console.error("Error handling price approval:", error);
+      toast.error("Something went wrong. Please try again.");
+    }
+  };
+
   const handleEditBooking = (booking: Booking) => {
     setEditingBooking(booking);
     setBookingDialogOpen(true);
@@ -335,11 +363,14 @@ const Dashboard = () => {
   const getStatusBadge = (status: string) => {
     const config: Record<string, { variant: "default" | "secondary" | "destructive" | "outline"; label: string }> = {
       pending: { variant: "secondary", label: "Pending" },
+      pending_address_verification: { variant: "secondary", label: "Awaiting Verification" },
+      price_change_pending: { variant: "secondary", label: "Price Change - Review" },
       verified: { variant: "default", label: "Verified" },
       rejected: { variant: "destructive", label: "Rejected" },
       confirmed: { variant: "default", label: "Confirmed" },
       completed: { variant: "outline", label: "Completed" },
       completed_pending_verification: { variant: "secondary", label: "Awaiting Review" },
+      completed_with_issues: { variant: "secondary", label: "Issues Reported" },
       disputed: { variant: "destructive", label: "Disputed" },
       cancelled: { variant: "destructive", label: "Cancelled" },
     };
@@ -367,7 +398,7 @@ const Dashboard = () => {
   const userName = user?.user_metadata?.full_name || "there";
   const verifiedAddresses = addresses.filter((a) => a.status === "verified");
   const pendingAddresses = addresses.filter((a) => a.status === "pending");
-  const upcomingBookings = bookings.filter((b) => b.status === "pending" || b.status === "confirmed");
+  const upcomingBookings = bookings.filter((b) => b.status === "pending" || b.status === "confirmed" || b.status === "pending_address_verification" || b.status === "price_change_pending");
   const completedBookings = bookings.filter((b) => b.status === "completed" || b.status === "completed_pending_verification" || b.status === "post_payment_dispute");
 
   return (
@@ -658,7 +689,7 @@ const Dashboard = () => {
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
-                          {address.status === "verified" && (
+                          {(address.status === "verified" || address.status === "pending") && (
                             <Button size="sm" onClick={() => openBookingDialog(address.id)}>
                               <Calendar className="w-4 h-4" />
                               <span className="hidden sm:inline ml-1">Book Now</span>
@@ -686,7 +717,7 @@ const Dashboard = () => {
           <div className="space-y-6">
             <div className="flex items-center justify-between">
               <h2 className="font-display text-lg md:text-xl font-bold text-foreground">My Bookings</h2>
-              <Button size="sm" disabled={verifiedAddresses.length === 0}>
+              <Button size="sm" disabled={addresses.filter(a => a.status === "verified" || a.status === "pending").length === 0} onClick={() => openBookingDialog()}>
                 <Plus className="w-4 h-4" />
                 <span className="hidden sm:inline">New Booking</span>
               </Button>
@@ -778,6 +809,22 @@ const Dashboard = () => {
                             >
                               <Trash2 className="w-4 h-4" />
                             </Button>
+                          </div>
+                        )}
+                        {booking.status === "price_change_pending" && (
+                          <div className="mt-3 p-3 rounded-lg border border-amber-300 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-700">
+                            <p className="text-sm font-medium text-amber-800 dark:text-amber-300 mb-1">Price Updated - Action Required</p>
+                            <p className="text-xs text-amber-700 dark:text-amber-400 mb-2">
+                              Original: ${Number(booking.original_price || 0).toFixed(2)} → New: ${Number(booking.total_price || 0).toFixed(2)}
+                            </p>
+                            <div className="flex gap-2">
+                              <Button size="sm" onClick={() => handlePriceApproval(booking.id, true)}>
+                                Approve New Price
+                              </Button>
+                              <Button size="sm" variant="destructive" onClick={() => handlePriceApproval(booking.id, false)}>
+                                Cancel Booking
+                              </Button>
+                            </div>
                           </div>
                         )}
                         {booking.status === "completed_pending_verification" && (
