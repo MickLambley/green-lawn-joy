@@ -209,9 +209,18 @@ const Admin = () => {
       return;
     }
 
+    // Process any bookings pending address verification
+    try {
+      await supabase.functions.invoke("verify-address-booking", {
+        body: { addressId: selectedAddress.id },
+      });
+    } catch (err) {
+      console.error("Error processing pending bookings:", err);
+    }
+
     toast({
       title: "Success",
-      description: `Address ${status === "verified" ? "verified" : "rejected"} successfully.`,
+      description: `Address ${status === "verified" ? "verified" : "rejected"} successfully. Any pending bookings have been processed.`,
     });
 
     setVerifyDialogOpen(false);

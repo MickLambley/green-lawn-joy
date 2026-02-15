@@ -20,7 +20,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Loader2, Calculator, CreditCard, Ruler, Scissors, Clock, CalendarDays, MapPin, User, Plus } from "lucide-react";
+import { Loader2, Calculator, CreditCard, Ruler, Scissors, Clock, CalendarDays, MapPin, User, Plus, AlertTriangle, Info } from "lucide-react";
 import PaymentDialog from "./PaymentDialog";
 import AddAddressDialog from "./AddAddressDialog";
 import type { Database } from "@/integrations/supabase/types";
@@ -101,6 +101,7 @@ const BookingDialog = ({ open, onOpenChange, addresses, defaultAddressId, onSucc
   const [createdBookingId, setCreatedBookingId] = useState<string | null>(null);
   const [contractors, setContractors] = useState<Contractor[]>([]);
   const [clientSecret, setClientSecret] = useState<string | null>(null);
+  const [isPreliminaryQuote, setIsPreliminaryQuote] = useState(false);
   
   // Form state
   const [selectedAddressId, setSelectedAddressId] = useState<string>("");
@@ -114,8 +115,10 @@ const BookingDialog = ({ open, onOpenChange, addresses, defaultAddressId, onSucc
   // Quote state
   const [quote, setQuote] = useState<QuoteBreakdown | null>(null);
 
-  const verifiedAddresses = addresses.filter(a => a.status === "verified");
-  const selectedAddress = verifiedAddresses.find(a => a.id === selectedAddressId);
+  // Allow both verified and pending addresses for booking
+  const bookableAddresses = addresses.filter(a => a.status === "verified" || a.status === "pending");
+  const selectedAddress = bookableAddresses.find(a => a.id === selectedAddressId);
+  const isUnverifiedAddress = selectedAddress?.status === "pending";
 
   const isEditMode = !!editingBooking;
 
@@ -125,9 +128,9 @@ const BookingDialog = ({ open, onOpenChange, addresses, defaultAddressId, onSucc
       setStep("form");
       setAgreedToTerms(false);
       setQuote(null);
+      setIsPreliminaryQuote(false);
       
       if (editingBooking) {
-        // Populate form with existing booking data
         setSelectedAddressId(editingBooking.address_id);
         setSelectedDate(new Date(editingBooking.scheduled_date));
         setGrassLength(editingBooking.grass_length || "medium");
@@ -136,7 +139,6 @@ const BookingDialog = ({ open, onOpenChange, addresses, defaultAddressId, onSucc
         setSelectSpecificContractor(!!editingBooking.preferred_contractor_id);
         setSelectedContractorId(editingBooking.preferred_contractor_id || "");
       } else {
-        // Reset form for new booking
         setSelectedDate(undefined);
         setGrassLength("medium");
         setClippingsRemoval(false);
@@ -144,11 +146,10 @@ const BookingDialog = ({ open, onOpenChange, addresses, defaultAddressId, onSucc
         setSelectSpecificContractor(false);
         setSelectedContractorId("");
         
-        // Set default address
-        if (defaultAddressId && verifiedAddresses.some(a => a.id === defaultAddressId)) {
+        if (defaultAddressId && bookableAddresses.some(a => a.id === defaultAddressId)) {
           setSelectedAddressId(defaultAddressId);
-        } else if (verifiedAddresses.length === 1) {
-          setSelectedAddressId(verifiedAddresses[0].id);
+        } else if (bookableAddresses.length === 1) {
+          setSelectedAddressId(bookableAddresses[0].id);
         } else {
           setSelectedAddressId("");
         }
@@ -163,9 +164,6 @@ const BookingDialog = ({ open, onOpenChange, addresses, defaultAddressId, onSucc
   }, [selectedAddress, selectSpecificContractor]);
 
   const fetchPricingSettings = async () => {
-    // Pricing settings are now server-side only
-    // We'll calculate quotes via edge function
-    // Set a placeholder to indicate settings are "available" for UI flow
     setPricingSettings({
       base_price_per_sqm: 0,
       fixed_base_price: 0,
@@ -186,7 +184,6 @@ const BookingDialog = ({ open, onOpenChange, addresses, defaultAddressId, onSucc
   const fetchContractorsForAddress = async () => {
     if (!selectedAddress) return;
     
-    // Fetch only non-sensitive contractor fields for preferred contractor selection
     const { data: contractorsData } = await supabase
       .from("contractors")
       .select("id, business_name, user_id, service_areas")
@@ -194,8 +191,6 @@ const BookingDialog = ({ open, onOpenChange, addresses, defaultAddressId, onSucc
       .eq("approval_status", "approved");
 
     if (contractorsData) {
-      // Filter contractors by service area (check if address city/state is in their service areas)
-      // If service_areas is empty, assume contractor serves all areas
       const filteredContractors = contractorsData.filter(c => 
         c.service_areas.length === 0 ||
         c.service_areas.some((area: string) => 
@@ -207,7 +202,6 @@ const BookingDialog = ({ open, onOpenChange, addresses, defaultAddressId, onSucc
         )
       );
 
-      // Fetch profiles for contractors (only full_name for display)
       const userIds = filteredContractors.map(c => c.user_id);
       const { data: profiles } = await supabase
         .from("profiles")
@@ -228,8 +222,6 @@ const BookingDialog = ({ open, onOpenChange, addresses, defaultAddressId, onSucc
     return day === 0 || day === 6;
   };
 
-  // Quote calculation is now handled server-side via edge function
-
   const handleGetQuote = async () => {
     if (!selectedAddressId) {
       toast.error("Please select an address");
@@ -242,7 +234,6 @@ const BookingDialog = ({ open, onOpenChange, addresses, defaultAddressId, onSucc
     
     setLoading(true);
     try {
-      // Calculate quote via edge function (pricing settings hidden from client)
       const { data, error } = await supabase.functions.invoke("calculate-quote", {
         body: {
           addressId: selectedAddressId,
@@ -257,6 +248,7 @@ const BookingDialog = ({ open, onOpenChange, addresses, defaultAddressId, onSucc
       }
 
       setQuote(data.quote);
+      setIsPreliminaryQuote(data.isPreliminary === true);
       setStep("quote");
     } catch (error) {
       console.error("Quote error:", error);
@@ -288,7 +280,6 @@ const BookingDialog = ({ open, onOpenChange, addresses, defaultAddressId, onSucc
       if (!user) throw new Error("Not authenticated");
 
       if (isEditMode && editingBooking) {
-        // Update existing booking
         const { error } = await supabase
           .from("bookings")
           .update({
@@ -307,14 +298,41 @@ const BookingDialog = ({ open, onOpenChange, addresses, defaultAddressId, onSucc
 
         if (error) throw error;
 
-        // Send booking updated email (non-blocking)
         sendBookingEmail(editingBooking.id, "updated");
-
         toast.success("Booking updated successfully!");
         onSuccess();
         onOpenChange(false);
+      } else if (isUnverifiedAddress) {
+        // For unverified addresses: create booking with pending_address_verification status, NO payment yet
+        const { data, error } = await supabase.from("bookings").insert([{
+          user_id: user.id,
+          address_id: selectedAddress.id,
+          scheduled_date: selectedDate.toISOString().split("T")[0],
+          scheduled_time: timeSlot,
+          grass_length: grassLength,
+          clippings_removal: clippingsRemoval,
+          time_slot: timeSlot,
+          is_weekend: isWeekend(selectedDate),
+          is_public_holiday: false,
+          total_price: totalWithGst,
+          quote_breakdown: JSON.parse(JSON.stringify(quote)),
+          status: "pending_address_verification" as any,
+          payment_status: "unpaid",
+          preferred_contractor_id: selectSpecificContractor && selectedContractorId ? selectedContractorId : null,
+        }]).select().single();
+
+        if (error) throw error;
+
+        // Send booking created email
+        sendBookingEmail(data.id, "created");
+
+        toast.success("Booking request submitted!", {
+          description: "Your address is being verified. We'll notify you once confirmed.",
+        });
+        onSuccess();
+        onOpenChange(false);
       } else {
-        // Create new booking with payment_status = 'pending' (not charged yet)
+        // Verified address: existing payment flow
         const { data, error } = await supabase.from("bookings").insert([{
           user_id: user.id,
           address_id: selectedAddress.id,
@@ -336,7 +354,6 @@ const BookingDialog = ({ open, onOpenChange, addresses, defaultAddressId, onSucc
 
         setCreatedBookingId(data.id);
         
-        // Create SetupIntent via edge function (saves card, doesn't charge)
         const { data: paymentData, error: paymentError } = await supabase.functions.invoke(
           "save-payment-method",
           {
@@ -349,7 +366,7 @@ const BookingDialog = ({ open, onOpenChange, addresses, defaultAddressId, onSucc
         }
 
         setClientSecret(paymentData.clientSecret);
-        onOpenChange(false); // Close booking dialog before opening payment
+        onOpenChange(false);
         setPaymentDialogOpen(true);
       }
     } catch (error) {
@@ -363,7 +380,6 @@ const BookingDialog = ({ open, onOpenChange, addresses, defaultAddressId, onSucc
   const handlePaymentSuccess = async (paymentMethodId: string) => {
     if (!createdBookingId) return;
 
-    // Update booking with payment method ID (card saved, not charged yet)
     await supabase
       .from("bookings")
       .update({ 
@@ -372,7 +388,6 @@ const BookingDialog = ({ open, onOpenChange, addresses, defaultAddressId, onSucc
       })
       .eq("id", createdBookingId);
 
-    // Send booking created email (non-blocking)
     sendBookingEmail(createdBookingId, "created");
 
     setPaymentDialogOpen(false);
@@ -383,7 +398,6 @@ const BookingDialog = ({ open, onOpenChange, addresses, defaultAddressId, onSucc
 
   const handlePaymentDialogClose = async (open: boolean) => {
     if (!open && createdBookingId) {
-      // Payment dialog was closed without saving payment method - delete the booking
       try {
         const { data: booking } = await supabase
           .from("bookings")
@@ -444,9 +458,9 @@ const BookingDialog = ({ open, onOpenChange, addresses, defaultAddressId, onSucc
                   <MapPin className="w-4 h-4" />
                   Select Address
                 </Label>
-                {verifiedAddresses.length === 0 ? (
+                {bookableAddresses.length === 0 ? (
                   <div className="p-4 bg-muted rounded-lg text-center">
-                    <p className="text-sm text-muted-foreground mb-3">No verified addresses available</p>
+                    <p className="text-sm text-muted-foreground mb-3">No addresses available</p>
                     <Button size="sm" variant="outline" onClick={() => setAddAddressDialogOpen(true)}>
                       <Plus className="w-4 h-4 mr-2" />
                       Add Address
@@ -459,9 +473,10 @@ const BookingDialog = ({ open, onOpenChange, addresses, defaultAddressId, onSucc
                         <SelectValue placeholder="Choose an address" />
                       </SelectTrigger>
                       <SelectContent>
-                        {verifiedAddresses.map((addr) => (
+                        {bookableAddresses.map((addr) => (
                           <SelectItem key={addr.id} value={addr.id}>
-                            {addr.street_address}, {addr.city} • {addr.square_meters}m²
+                            {addr.street_address}, {addr.city} • {addr.square_meters ? `${addr.square_meters}m²` : "Area pending"}
+                            {addr.status === "pending" && " (Unverified)"}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -476,6 +491,20 @@ const BookingDialog = ({ open, onOpenChange, addresses, defaultAddressId, onSucc
                       <Plus className="w-3 h-3 mr-1" />
                       Add new address
                     </Button>
+                  </div>
+                )}
+
+                {/* Unverified address notice */}
+                {isUnverifiedAddress && (
+                  <div className="p-3 rounded-lg border border-amber-300 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-700">
+                    <div className="flex gap-2">
+                      <Info className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" />
+                      <div className="text-sm text-amber-800 dark:text-amber-300">
+                        <p className="font-medium mb-1">Address Pending Verification</p>
+                        <p>Your address will be verified by our team within 24 hours. Pricing may be adjusted based on the verified lawn size. You will be notified if any changes are required.</p>
+                        <p className="mt-1 font-medium">No payment will be taken until verification is complete.</p>
+                      </div>
+                    </div>
                   </div>
                 )}
               </div>
@@ -569,52 +598,54 @@ const BookingDialog = ({ open, onOpenChange, addresses, defaultAddressId, onSucc
                     <Switch checked={clippingsRemoval} onCheckedChange={setClippingsRemoval} />
                   </div>
 
-                  {/* Specific Contractor Selection */}
-                  <div className="space-y-3 p-4 rounded-xl border border-border">
-                    <div className="flex items-center space-x-2">
-                      <Checkbox
-                        id="specific-contractor"
-                        checked={selectSpecificContractor}
-                        onCheckedChange={(checked) => {
-                          setSelectSpecificContractor(checked === true);
-                          if (!checked) setSelectedContractorId("");
-                        }}
-                      />
-                      <label
-                        htmlFor="specific-contractor"
-                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                      >
-                        Request a specific contractor
-                      </label>
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      By default, any available contractor in your area can accept this job.
-                    </p>
-                    
-                    {selectSpecificContractor && (
-                      <div className="pt-2">
-                        {contractors.length === 0 ? (
-                          <p className="text-sm text-muted-foreground">No contractors available in your area</p>
-                        ) : (
-                          <Select value={selectedContractorId} onValueChange={setSelectedContractorId}>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Choose a contractor" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {contractors.map((contractor) => (
-                                <SelectItem key={contractor.id} value={contractor.id}>
-                                  <div className="flex items-center gap-2">
-                                    <User className="w-4 h-4" />
-                                    {getContractorName(contractor)}
-                                  </div>
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        )}
+                  {/* Specific Contractor Selection - only for verified addresses */}
+                  {!isUnverifiedAddress && (
+                    <div className="space-y-3 p-4 rounded-xl border border-border">
+                      <div className="flex items-center space-x-2">
+                        <Checkbox
+                          id="specific-contractor"
+                          checked={selectSpecificContractor}
+                          onCheckedChange={(checked) => {
+                            setSelectSpecificContractor(checked === true);
+                            if (!checked) setSelectedContractorId("");
+                          }}
+                        />
+                        <label
+                          htmlFor="specific-contractor"
+                          className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                        >
+                          Request a specific contractor
+                        </label>
                       </div>
-                    )}
-                  </div>
+                      <p className="text-xs text-muted-foreground">
+                        By default, any available contractor in your area can accept this job.
+                      </p>
+                      
+                      {selectSpecificContractor && (
+                        <div className="pt-2">
+                          {contractors.length === 0 ? (
+                            <p className="text-sm text-muted-foreground">No contractors available in your area</p>
+                          ) : (
+                            <Select value={selectedContractorId} onValueChange={setSelectedContractorId}>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Choose a contractor" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {contractors.map((contractor) => (
+                                  <SelectItem key={contractor.id} value={contractor.id}>
+                                    <div className="flex items-center gap-2">
+                                      <User className="w-4 h-4" />
+                                      {getContractorName(contractor)}
+                                    </div>
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </>
               )}
 
@@ -622,20 +653,33 @@ const BookingDialog = ({ open, onOpenChange, addresses, defaultAddressId, onSucc
                 className="w-full" 
                 size="lg" 
                 onClick={handleGetQuote}
-                disabled={!selectedAddressId || !selectedDate || loading}
+                disabled={!selectedAddressId || !selectedDate || loading || (selectedAddress && !selectedAddress.square_meters)}
               >
                 {loading ? (
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                 ) : (
                   <Calculator className="w-4 h-4 mr-2" />
                 )}
-                Get Instant Quote
+                {isUnverifiedAddress ? "Get Preliminary Quote" : "Get Instant Quote"}
               </Button>
             </div>
           )}
 
           {step === "quote" && quote && selectedAddress && (
             <div className="space-y-6">
+              {/* Preliminary quote notice */}
+              {isPreliminaryQuote && (
+                <div className="p-3 rounded-lg border border-amber-300 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-700">
+                  <div className="flex gap-2">
+                    <AlertTriangle className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" />
+                    <div className="text-sm text-amber-800 dark:text-amber-300">
+                      <p className="font-medium">Preliminary Quote</p>
+                      <p>This quote is based on your self-reported lawn size. The final price may change after our team verifies your address. You'll be notified of any price changes before being charged.</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Simple Quote Summary */}
               <div className="p-4 bg-muted rounded-lg space-y-2 text-sm">
                 <p><strong>Date:</strong> {selectedDate?.toLocaleDateString("en-AU", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}</p>
@@ -657,9 +701,12 @@ const BookingDialog = ({ open, onOpenChange, addresses, defaultAddressId, onSucc
                   <span>${gstAmount.toFixed(2)}</span>
                 </div>
                 <div className="border-t pt-3 flex justify-between font-bold text-lg">
-                  <span>Total (inc GST)</span>
+                  <span>Total (inc GST){isPreliminaryQuote ? " *" : ""}</span>
                   <span className="text-primary">${totalWithGst.toFixed(2)}</span>
                 </div>
+                {isPreliminaryQuote && (
+                  <p className="text-xs text-muted-foreground">* Subject to change after address verification</p>
+                )}
               </div>
 
               {/* Terms & Conditions Agreement */}
@@ -691,10 +738,12 @@ const BookingDialog = ({ open, onOpenChange, addresses, defaultAddressId, onSucc
                 <Button className="flex-1" size="lg" onClick={handleBookNow} disabled={loading || (!isEditMode && !agreedToTerms)}>
                   {loading ? (
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  ) : isUnverifiedAddress ? (
+                    <CalendarDays className="w-4 h-4 mr-2" />
                   ) : (
                     <CreditCard className="w-4 h-4 mr-2" />
                   )}
-                  {isEditMode ? "Update Booking" : "Book Now"}
+                  {isEditMode ? "Update Booking" : isUnverifiedAddress ? "Submit Booking Request" : "Book Now"}
                 </Button>
               </div>
             </div>
