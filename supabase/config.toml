@@ -29,3 +29,6 @@ verify_jwt = false
 
 [functions.approve-price-change]
 verify_jwt = false
+
+[functions.auto-cancel-stale-bookings]
+verify_jwt = false
