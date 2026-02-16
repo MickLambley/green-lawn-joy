@@ -32,3 +32,6 @@ verify_jwt = false
 
 [functions.auto-cancel-stale-bookings]
 verify_jwt = false
+
+[functions.admin-manage-users]
+verify_jwt = false
