@@ -31,6 +31,7 @@ import {
 } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
 import { Leaf, LogOut, MapPin, Calendar, Check, X, Eye, Settings, Users, PenTool, AlertTriangle, Star, ShieldAlert } from "lucide-react";
+import AdminSummaryCards, { type AdminFilter } from "@/components/admin/AdminSummaryCards";
 import PricingSettingsTab from "@/components/admin/PricingSettingsTab";
 import ContractorApplicationsTab from "@/components/admin/ContractorApplicationsTab";
 import AdminLawnEditorDialog from "@/components/admin/AdminLawnEditorDialog";
@@ -84,6 +85,8 @@ const Admin = () => {
   const [verifyDialogOpen, setVerifyDialogOpen] = useState(false);
   const [bookingDialogOpen, setBookingDialogOpen] = useState(false);
   const [lawnEditorDialogOpen, setLawnEditorDialogOpen] = useState(false);
+  const [activeFilter, setActiveFilter] = useState<AdminFilter>(null);
+  const [activeTab, setActiveTab] = useState("addresses");
   
   // Verification form state - only slope, tiers, and square meters
   const [squareMeters, setSquareMeters] = useState("");
@@ -309,6 +312,48 @@ const Admin = () => {
   const pendingAddresses = addresses.filter((a) => a.status === "pending");
   const pendingBookings = bookings.filter((b) => b.status === "pending");
 
+  const handleSummaryFilter = (filter: AdminFilter) => {
+    setActiveFilter(filter);
+    if (filter === "pending_addresses") setActiveTab("addresses");
+    else if (filter === "unassigned_jobs" || filter === "price_change_pending" || filter === "revenue") setActiveTab("bookings");
+    else if (filter === "disputes") setActiveTab("disputes");
+    else if (filter === "quality") setActiveTab("quality");
+    else if (filter === "contractors") setActiveTab("contractors");
+    else if (filter === null) setActiveFilter(null);
+  };
+
+  // Filtered data based on active summary card
+  const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+  const weekStart = (() => {
+    const now = new Date();
+    const dow = now.getDay();
+    const off = dow === 0 ? 6 : dow - 1;
+    const d = new Date(now);
+    d.setDate(now.getDate() - off);
+    d.setHours(0, 0, 0, 0);
+    return d.toISOString();
+  })();
+
+  const filteredAddresses = activeFilter === "pending_addresses"
+    ? addresses.filter((a) => a.status === "pending")
+    : addresses;
+
+  const filteredBookings = (() => {
+    if (activeFilter === "unassigned_jobs")
+      return bookings.filter(
+        (b) => b.status === "confirmed" && !b.contractor_id && b.created_at < twentyFourHoursAgo
+      );
+    if (activeFilter === "price_change_pending")
+      return bookings.filter((b) => b.status === "price_change_pending");
+    if (activeFilter === "revenue")
+      return bookings.filter(
+        (b) =>
+          ["completed", "completed_pending_verification"].includes(b.status) &&
+          b.completed_at && b.completed_at >= weekStart
+      );
+    return bookings;
+  })();
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -331,67 +376,9 @@ const Admin = () => {
       </header>
 
       <main className="container mx-auto px-4 py-8">
-        {/* Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-4">
-                <div className="p-3 rounded-xl bg-yellow-100 dark:bg-yellow-900/20">
-                  <MapPin className="w-6 h-6 text-yellow-600" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold">{pendingAddresses.length}</p>
-                  <p className="text-sm text-muted-foreground">Pending Addresses</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-4">
-                <div className="p-3 rounded-xl bg-blue-100 dark:bg-blue-900/20">
-                  <Calendar className="w-6 h-6 text-blue-600" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold">{pendingBookings.length}</p>
-                  <p className="text-sm text-muted-foreground">Pending Bookings</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-4">
-                <div className="p-3 rounded-xl bg-green-100 dark:bg-green-900/20">
-                  <Check className="w-6 h-6 text-green-600" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold">
-                    {addresses.filter((a) => a.status === "verified").length}
-                  </p>
-                  <p className="text-sm text-muted-foreground">Verified Addresses</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-4">
-                <div className="p-3 rounded-xl bg-purple-100 dark:bg-purple-900/20">
-                  <Calendar className="w-6 h-6 text-purple-600" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold">
-                    {bookings.filter((b) => b.status === "completed").length}
-                  </p>
-                  <p className="text-sm text-muted-foreground">Completed Jobs</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+        <AdminSummaryCards activeFilter={activeFilter} onFilterChange={handleSummaryFilter} />
 
-        <Tabs defaultValue="addresses" className="space-y-6">
+        <Tabs value={activeTab} onValueChange={(v) => { setActiveTab(v); setActiveFilter(null); }} className="space-y-6">
           <TabsList>
             <TabsTrigger value="addresses" className="flex items-center gap-2">
               <MapPin className="w-4 h-4" />
@@ -429,10 +416,17 @@ const Admin = () => {
           <TabsContent value="addresses">
             <Card>
               <CardHeader>
-                <CardTitle>Address Verification</CardTitle>
+                <div className="flex items-center justify-between">
+                  <CardTitle>Address Verification</CardTitle>
+                  {activeFilter === "pending_addresses" && (
+                    <Badge variant="outline" className="cursor-pointer" onClick={() => setActiveFilter(null)}>
+                      Showing: Pending only ✕
+                    </Badge>
+                  )}
+                </div>
               </CardHeader>
               <CardContent>
-                {addresses.length === 0 ? (
+                {filteredAddresses.length === 0 ? (
                   <p className="text-muted-foreground text-center py-8">No addresses to review.</p>
                 ) : (
                   <Table>
@@ -447,7 +441,7 @@ const Admin = () => {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {addresses.map((address) => (
+                      {filteredAddresses.map((address) => (
                         <TableRow key={address.id}>
                           <TableCell>{address.customerName || "Unknown"}</TableCell>
                           <TableCell>
@@ -496,11 +490,18 @@ const Admin = () => {
           <TabsContent value="bookings">
             <Card>
               <CardHeader>
-                <CardTitle>Booking Management</CardTitle>
+                <div className="flex items-center justify-between">
+                  <CardTitle>Booking Management</CardTitle>
+                  {(activeFilter === "unassigned_jobs" || activeFilter === "price_change_pending" || activeFilter === "revenue") && (
+                    <Badge variant="outline" className="cursor-pointer" onClick={() => setActiveFilter(null)}>
+                      Showing: {activeFilter === "unassigned_jobs" ? "Unassigned >24h" : activeFilter === "price_change_pending" ? "Awaiting Approval" : "Completed This Week"} ✕
+                    </Badge>
+                  )}
+                </div>
               </CardHeader>
               <CardContent>
-                {bookings.length === 0 ? (
-                  <p className="text-muted-foreground text-center py-8">No bookings yet.</p>
+                {filteredBookings.length === 0 ? (
+                  <p className="text-muted-foreground text-center py-8">No bookings match this filter.</p>
                 ) : (
                   <Table>
                     <TableHeader>
@@ -514,7 +515,7 @@ const Admin = () => {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {bookings.map((booking) => (
+                      {filteredBookings.map((booking) => (
                         <TableRow key={booking.id}>
                           <TableCell>{booking.customerName || "Unknown"}</TableCell>
                           <TableCell>
