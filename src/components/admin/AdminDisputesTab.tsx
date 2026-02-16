@@ -173,7 +173,9 @@ const AdminDisputesTab = () => {
       body: { userIds: [...new Set(allUserIds)] },
     });
     const emailMap = new Map<string, string>(
-      emailData?.emails?.map((e: { user_id: string; email: string }) => [e.user_id, e.email]) || []
+      emailData?.emails
+        ? Object.entries(emailData.emails as Record<string, string>)
+        : []
     );
 
     const enriched: DisputeWithDetails[] = disputeData.map(d => {
