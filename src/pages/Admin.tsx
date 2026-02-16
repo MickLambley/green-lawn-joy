@@ -30,7 +30,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
-import { Leaf, LogOut, MapPin, Calendar, Check, X, Eye, Settings, Users, PenTool, AlertTriangle, Star, ShieldAlert } from "lucide-react";
+import { Leaf, LogOut, MapPin, Calendar, Check, X, Eye, Settings, Users, PenTool, AlertTriangle, Star, ShieldAlert, UserCog } from "lucide-react";
 import AdminSummaryCards, { type AdminFilter } from "@/components/admin/AdminSummaryCards";
 import PricingSettingsTab from "@/components/admin/PricingSettingsTab";
 import ContractorApplicationsTab from "@/components/admin/ContractorApplicationsTab";
@@ -38,6 +38,7 @@ import AdminLawnEditorDialog from "@/components/admin/AdminLawnEditorDialog";
 import AdminDisputesTab from "@/components/admin/AdminDisputesTab";
 import AdminQualityAlertsTab from "@/components/admin/AdminQualityAlertsTab";
 import AdminBookingPhotosSection from "@/components/admin/AdminBookingPhotosSection";
+import UserManagementTab from "@/components/admin/UserManagementTab";
 import type { Database } from "@/integrations/supabase/types";
 
 // Badge component for pending contractors
@@ -411,6 +412,10 @@ const Admin = () => {
               <ShieldAlert className="w-4 h-4" />
               Quality
             </TabsTrigger>
+            <TabsTrigger value="users" className="flex items-center gap-2">
+              <UserCog className="w-4 h-4" />
+              Users
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="addresses">
@@ -576,6 +581,10 @@ const Admin = () => {
 
           <TabsContent value="quality">
             <AdminQualityAlertsTab />
+          </TabsContent>
+
+          <TabsContent value="users">
+            <UserManagementTab />
           </TabsContent>
         </Tabs>
       </main>

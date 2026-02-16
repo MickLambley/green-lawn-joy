@@ -719,6 +719,42 @@ export type Database = {
         }
         Relationships: []
       }
+      user_status_audit: {
+        Row: {
+          changed_by: string
+          changed_by_email: string | null
+          created_at: string
+          id: string
+          new_status: string
+          previous_status: string
+          reason: string | null
+          user_id: string
+          user_type: string
+        }
+        Insert: {
+          changed_by: string
+          changed_by_email?: string | null
+          created_at?: string
+          id?: string
+          new_status: string
+          previous_status: string
+          reason?: string | null
+          user_id: string
+          user_type: string
+        }
+        Update: {
+          changed_by?: string
+          changed_by_email?: string | null
+          created_at?: string
+          id?: string
+          new_status?: string
+          previous_status?: string
+          reason?: string | null
+          user_id?: string
+          user_type?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
